@@ -1,0 +1,581 @@
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
+import { UserModel } from "../../models/user.model.js";
+import { CategoryModel } from "../../models/category.model.js";
+import { SubCategoryModel } from "../../models/sub-category.model.js";
+import { MarketplaceNotificationModel } from "../../models/notification.model.js";
+import { VendorProfileModel } from "../../models/vendor-profile.model.js";
+import { asyncHandler } from "../../utils/async-handler.js";
+import { HttpError } from "../../utils/http-error.js";
+import {
+  buildProfileCreatedNotifications,
+  buildProfileModerationMessage,
+  canDeleteCategory,
+  canDeleteSubCategory,
+  createUserNotification,
+  NOTIFICATION_TARGET_PATHS,
+  notifyAllSuperAdmins,
+  resolveLocationInput,
+  serializeCategory,
+  serializeMarketplaceListing,
+  serializeNotification,
+  serializePlatformUser,
+  serializeSubCategory,
+  validateCategoryAndSubCategory,
+} from "./marketplace.service.js";
+
+const categorySchema = z.object({
+  name: z.string().trim().min(1, "Category name is required."),
+  status: z.enum(["active", "inactive"]).default("active"),
+});
+
+const subCategorySchema = z.object({
+  categoryId: z.string().trim().min(1, "Category is required."),
+  name: z.string().trim().min(1, "Sub-category name is required."),
+  status: z.enum(["active", "inactive"]).default("active"),
+});
+
+const imageCropSchema = z.object({
+  zoom: z.number().min(1).max(4),
+  x: z.number().min(-100).max(100),
+  y: z.number().min(-100).max(100),
+});
+
+const listingSchema = z.object({
+  title: z.string().trim().min(1, "Profile title is required."),
+  categoryId: z.string().trim().min(1, "Category is required."),
+  subCategoryId: z.string().trim().min(1, "Sub-category is required."),
+  experience: z.string().trim().min(1, "Experience is required."),
+  price: z.string().trim().min(1, "Price is required."),
+  description: z.string().trim().min(1, "Description is required."),
+  featuredImage: z.string().trim().min(1, "Featured image is required."),
+  featuredImageCrop: imageCropSchema.nullable().optional(),
+  locationInput: z.string().trim().min(1, "Location input is required."),
+  placeId: z.string().trim().optional().default(""),
+  coordinates: z.object({
+    lat: z.coerce.number().finite(),
+    lng: z.coerce.number().finite(),
+  }),
+  address: z.string().trim().min(1, "Address is required."),
+  colony: z.string().trim().min(1, "Colony or street is required."),
+  area: z.string().trim().min(1, "Area is required."),
+  pincode: z.string().trim().min(1, "Pincode is required."),
+  state: z.string().trim().min(1, "State is required."),
+  city: z.string().trim().min(1, "City is required."),
+  district: z.string().trim().min(1, "District is required."),
+  portfolioImages: z.array(z.string().trim().min(1)).min(1, "At least one portfolio image is required."),
+  albums: z.array(
+    z.object({
+      name: z.string().trim().min(1, "Album name is required."),
+      images: z.array(z.string().trim().min(1)).min(1, "Album must include at least one image."),
+    }),
+  ).default([]),
+  youtubeLinks: z.array(
+    z.object({
+      url: z.string().trim().min(1, "YouTube link is required."),
+      thumb: z.string().trim().nullable().optional(),
+      videoId: z.string().trim().nullable().optional(),
+    }),
+  ).default([]),
+});
+
+const locationResolveSchema = z.object({
+  input: z.string().trim().min(1, "Location input is required."),
+});
+
+const marketplaceRouter = Router();
+
+marketplaceRouter.use(requireAuth);
+
+marketplaceRouter.get(
+  "/users",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (_request, response) => {
+    const users = await UserModel.find().sort({ createdAt: -1 });
+    response.status(200).json({
+      success: true,
+      data: users.map((user) => serializePlatformUser(user)),
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/notifications",
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const notifications = await MarketplaceNotificationModel.find({
+      recipientUserId: request.authUser.id,
+    }).sort({ createdAt: -1 });
+
+    response.status(200).json({
+      success: true,
+      data: notifications.map((notification) => serializeNotification(notification)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/notifications/read-all",
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    await MarketplaceNotificationModel.updateMany(
+      { recipientUserId: request.authUser.id, read: false },
+      { $set: { read: true } },
+    );
+
+    response.status(200).json({
+      success: true,
+      message: "Notifications marked as read.",
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/notifications/:notificationId",
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const notification = await MarketplaceNotificationModel.findOne({
+      _id: request.params.notificationId,
+      recipientUserId: request.authUser.id,
+    });
+
+    if (!notification) {
+      throw new HttpError(404, "Notification not found.");
+    }
+
+    notification.read = true;
+    await notification.save();
+    await notification.deleteOne();
+
+    response.status(200).json({
+      success: true,
+      message: "Notification removed successfully.",
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/categories",
+  asyncHandler(async (_request, response) => {
+    const categories = await CategoryModel.find().sort({ name: 1, createdAt: -1 });
+    response.status(200).json({
+      success: true,
+      data: categories.map((category) => serializeCategory(category)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/categories",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = categorySchema.parse(request.body);
+    const existing = await CategoryModel.findOne({ name: input.name });
+    if (existing) {
+      throw new HttpError(409, "A category with this name already exists.");
+    }
+
+    const category = await CategoryModel.create({
+      ...input,
+      createdByUserId: request.authUser.id,
+    });
+
+    response.status(201).json({
+      success: true,
+      message: "Category created successfully.",
+      data: serializeCategory(category),
+    });
+  }),
+);
+
+marketplaceRouter.patch(
+  "/categories/:categoryId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const input = categorySchema.parse(request.body);
+    const category = await CategoryModel.findById(request.params.categoryId);
+    if (!category) {
+      throw new HttpError(404, "Category not found.");
+    }
+
+    const duplicate = await CategoryModel.findOne({ name: input.name, _id: { $ne: category.id } });
+    if (duplicate) {
+      throw new HttpError(409, "A category with this name already exists.");
+    }
+
+    category.name = input.name;
+    category.status = input.status;
+    await category.save();
+
+    await Promise.all([
+      SubCategoryModel.updateMany(
+        { categoryId: category.id },
+        { $set: {} },
+      ),
+      VendorProfileModel.updateMany(
+        { categoryId: category.id },
+        { $set: { category: category.name } },
+      ),
+    ]);
+
+    response.status(200).json({
+      success: true,
+      message: "Category updated successfully.",
+      data: serializeCategory(category),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/categories/:categoryId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const category = await CategoryModel.findById(request.params.categoryId);
+    if (!category) {
+      throw new HttpError(404, "Category not found.");
+    }
+
+    await canDeleteCategory(category.id);
+    await category.deleteOne();
+
+    response.status(200).json({
+      success: true,
+      message: "Category deleted successfully.",
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/sub-categories",
+  asyncHandler(async (request, response) => {
+    const categoryId = typeof request.query.categoryId === "string" ? request.query.categoryId : "";
+    const query = categoryId ? { categoryId } : {};
+    const subCategories = await SubCategoryModel.find(query).sort({ name: 1, createdAt: -1 });
+
+    response.status(200).json({
+      success: true,
+      data: subCategories.map((subCategory) => serializeSubCategory(subCategory)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/sub-categories",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = subCategorySchema.parse(request.body);
+    const category = await CategoryModel.findById(input.categoryId);
+    if (!category) {
+      throw new HttpError(400, "Selected category does not exist.");
+    }
+
+    const existing = await SubCategoryModel.findOne({
+      categoryId: input.categoryId,
+      name: input.name,
+    });
+    if (existing) {
+      throw new HttpError(409, "A sub-category with this name already exists in the selected category.");
+    }
+
+    const subCategory = await SubCategoryModel.create({
+      ...input,
+      createdByUserId: request.authUser.id,
+    });
+
+    response.status(201).json({
+      success: true,
+      message: "Sub-category created successfully.",
+      data: serializeSubCategory(subCategory),
+    });
+  }),
+);
+
+marketplaceRouter.patch(
+  "/sub-categories/:subCategoryId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const input = subCategorySchema.parse(request.body);
+    const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
+    if (!subCategory) {
+      throw new HttpError(404, "Sub-category not found.");
+    }
+
+    const category = await CategoryModel.findById(input.categoryId);
+    if (!category) {
+      throw new HttpError(400, "Selected category does not exist.");
+    }
+
+    const duplicate = await SubCategoryModel.findOne({
+      categoryId: input.categoryId,
+      name: input.name,
+      _id: { $ne: subCategory.id },
+    });
+    if (duplicate) {
+      throw new HttpError(409, "A sub-category with this name already exists in the selected category.");
+    }
+
+    const previousCategoryId = subCategory.categoryId;
+    subCategory.categoryId = input.categoryId;
+    subCategory.name = input.name;
+    subCategory.status = input.status;
+    await subCategory.save();
+
+    await VendorProfileModel.updateMany(
+      { subCategoryId: subCategory.id },
+      {
+        $set: {
+          subCategory: subCategory.name,
+          ...(previousCategoryId !== input.categoryId ? { categoryId: input.categoryId, category: category.name } : {}),
+        },
+      },
+    );
+
+    response.status(200).json({
+      success: true,
+      message: "Sub-category updated successfully.",
+      data: serializeSubCategory(subCategory),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/sub-categories/:subCategoryId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
+    if (!subCategory) {
+      throw new HttpError(404, "Sub-category not found.");
+    }
+
+    await canDeleteSubCategory(subCategory.id);
+    await subCategory.deleteOne();
+
+    response.status(200).json({
+      success: true,
+      message: "Sub-category deleted successfully.",
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/location/resolve",
+  asyncHandler(async (request, response) => {
+    const input = locationResolveSchema.parse(request.body);
+    const location = await resolveLocationInput(input.input);
+
+    response.status(200).json({
+      success: true,
+      message: location.message || "Location resolved successfully.",
+      data: location,
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/listings",
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const query = request.authUser.role === "super-admin"
+      ? {}
+      : request.authUser.role === "vendor"
+        ? { vendorId: request.authUser.id }
+        : { status: "approved" };
+
+    const listings = await VendorProfileModel.find(query).sort({ createdAt: -1, updatedAt: -1 });
+
+    response.status(200).json({
+      success: true,
+      data: listings.map((listing) => serializeMarketplaceListing(listing)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/listings",
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = listingSchema.parse(request.body);
+    const { category, subCategory } = await validateCategoryAndSubCategory(input.categoryId, input.subCategoryId);
+
+    const profile = await VendorProfileModel.create({
+      vendorId: request.authUser.id,
+      vendorName: request.authUser.name,
+      vendorEmail: request.authUser.email,
+      title: input.title,
+      categoryId: category.id,
+      category: category.name,
+      subCategoryId: subCategory.id,
+      subCategory: subCategory.name,
+      experience: input.experience,
+      price: input.price,
+      description: input.description,
+      featuredImage: input.featuredImage,
+      featuredImageCrop: input.featuredImageCrop ?? null,
+      locationInput: input.locationInput,
+      placeId: input.placeId,
+      coordinates: input.coordinates,
+      address: input.address,
+      colony: input.colony,
+      area: input.area,
+      pincode: input.pincode,
+      state: input.state,
+      city: input.city,
+      district: input.district,
+      portfolioImages: input.portfolioImages,
+      albums: input.albums,
+      youtubeLinks: input.youtubeLinks,
+      status: "pending",
+    });
+
+    await UserModel.findByIdAndUpdate(request.authUser.id, {
+      $set: { profileComplete: true },
+    });
+
+    const notifications = buildProfileCreatedNotifications(request.authUser.name);
+    await Promise.all([
+      createUserNotification(request.authUser.id, "vendor", notifications.vendor, {
+        targetPath: NOTIFICATION_TARGET_PATHS.listings,
+      }),
+      notifyAllSuperAdmins(notifications.admin, {
+        targetPath: NOTIFICATION_TARGET_PATHS.listings,
+      }),
+    ]);
+
+    response.status(201).json({
+      success: true,
+      message: "Profile created successfully.",
+      data: serializeMarketplaceListing(profile),
+    });
+  }),
+);
+
+marketplaceRouter.patch(
+  "/listings/:listingId",
+  authorizeRoles("vendor", "super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = listingSchema.parse(request.body);
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    if (authUser.role === "vendor" && listing.vendorId !== authUser.id) {
+      throw new HttpError(403, "You can only edit your own profiles.");
+    }
+
+    const { category, subCategory } = await validateCategoryAndSubCategory(input.categoryId, input.subCategoryId);
+
+    listing.title = input.title;
+    listing.categoryId = category.id;
+    listing.category = category.name;
+    listing.subCategoryId = subCategory.id;
+    listing.subCategory = subCategory.name;
+    listing.experience = input.experience;
+    listing.price = input.price;
+    listing.description = input.description;
+    listing.featuredImage = input.featuredImage;
+    listing.featuredImageCrop = input.featuredImageCrop ?? null;
+    listing.locationInput = input.locationInput;
+    listing.placeId = input.placeId;
+    listing.coordinates = input.coordinates;
+    listing.address = input.address;
+    listing.colony = input.colony;
+    listing.area = input.area;
+    listing.pincode = input.pincode;
+    listing.state = input.state;
+    listing.city = input.city;
+    listing.district = input.district;
+    listing.portfolioImages = input.portfolioImages;
+    listing.albums = input.albums;
+    listing.youtubeLinks = input.youtubeLinks;
+    await listing.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/listings/:listingId/approve",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    listing.status = "approved";
+    await listing.save();
+
+    await createUserNotification(listing.vendorId, "vendor", buildProfileModerationMessage("approved"), {
+      targetPath: NOTIFICATION_TARGET_PATHS.listings,
+    });
+
+    response.status(200).json({
+      success: true,
+      message: "Profile approved successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/listings/:listingId/reject",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    listing.status = "rejected";
+    await listing.save();
+
+    await createUserNotification(listing.vendorId, "vendor", buildProfileModerationMessage("rejected"), {
+      targetPath: NOTIFICATION_TARGET_PATHS.listings,
+    });
+
+    response.status(200).json({
+      success: true,
+      message: "Profile rejected successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+export { marketplaceRouter };
+
+

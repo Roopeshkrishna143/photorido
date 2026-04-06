@@ -1,0 +1,19 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Placeholder production deployment
+        run: |
+          echo "Production deployment placeholder"
+          echo "Replace this step with the real production deployment command for frontend, backend, and admin when infrastructure is ready."

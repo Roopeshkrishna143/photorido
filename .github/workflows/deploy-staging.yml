@@ -1,0 +1,19 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Placeholder staging deployment
+        run: |
+          echo "Staging deployment placeholder"
+          echo "Replace this step with the real staging deployment command for frontend, backend, and admin when infrastructure is ready."

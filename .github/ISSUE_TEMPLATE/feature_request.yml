@@ -1,0 +1,40 @@
+name: Feature Request
+description: Propose a new feature or product improvement for Photorido.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What user or business problem are we solving?
+      placeholder: Vendors need a clearer way to manage booking conflicts.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the desired behavior or implementation direction.
+      placeholder: Add a calendar conflict panel inside the vendor schedule dashboard.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected Impact
+      description: Explain how this helps users, operations, or product goals.
+      placeholder: This reduces double-bookings and support requests.
+    validations:
+      required: true
+  - type: dropdown
+    id: branch_type
+    attributes:
+      label: Planned Branch Type
+      options:
+        - feature/*
+        - release/*
+        - hotfix/*
+    validations:
+      required: true

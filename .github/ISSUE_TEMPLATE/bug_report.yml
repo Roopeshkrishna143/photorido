@@ -1,0 +1,51 @@
+name: Bug Report
+description: Report a problem with the frontend, backend, admin scaffold, or delivery workflow.
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem clearly and include the affected area.
+      placeholder: Users cannot complete checkout from the vendor dashboard.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the exact steps that trigger the issue.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: The booking should be created and the user should see a confirmation.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: The page stays loading and the API returns a 500 error.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected Surface
+      options:
+        - frontend
+        - backend
+        - admin
+        - docs
+        - ci-cd
+    validations:
+      required: true

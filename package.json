@@ -1,0 +1,16 @@
+{
+  "name": "photorido",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:admin": "npm --prefix admin run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:admin": "npm --prefix admin run build",
+    "check:backend": "npm --prefix backend run check",
+    "test:backend": "npm --prefix backend run test",
+    "ci": "npm run build:frontend && npm run build:admin && npm run build:backend && npm run test:backend"
+  }
+}
