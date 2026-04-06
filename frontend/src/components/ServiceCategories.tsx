@@ -1,25 +1,21 @@
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import type { MarketplacePublicServiceCategory } from "../hooks/useMarketplacePublicSummary";
+import type { HomeBrowseServiceCard } from "../hooks/useMarketplacePublicSummary";
 import { getServiceCategoryVisual } from "../lib/public-marketplace";
 
 interface ServiceCategoriesProps {
-  categories: MarketplacePublicServiceCategory[];
+  cards: HomeBrowseServiceCard[];
   isLoading?: boolean;
   error?: string | null;
-  onCategorySelect?: (categoryName: string) => void;
+  onServiceSelect?: (serviceName: string) => void;
 }
-
-const compactNumberFormatter = new Intl.NumberFormat("en-IN", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
 
 const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
+      staggerChildren: 0.08,
     },
   },
 };
@@ -29,12 +25,101 @@ const item = {
   show: { opacity: 1, y: 0 },
 };
 
+function getCardsPerPage() {
+  if (typeof window === "undefined") {
+    return 6;
+  }
+
+  if (window.innerWidth >= 1280) {
+    return 6;
+  }
+
+  if (window.innerWidth >= 768) {
+    return 3;
+  }
+
+  return 2;
+}
+
+function ServiceCard({
+  card,
+  onSelect,
+}: {
+  card: HomeBrowseServiceCard;
+  onSelect?: (serviceName: string) => void;
+}) {
+  const visual = getServiceCategoryVisual(card.name);
+  const Icon = visual.icon;
+
+  return (
+    <motion.button
+      type="button"
+      variants={item}
+      whileHover={{ y: -6, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onSelect?.(card.name)}
+      className="h-full text-left"
+    >
+      <div className="h-full rounded-[28px] border border-[#e7f0ff] bg-gradient-to-b from-white to-[#f6f9ff] px-6 py-7 text-center shadow-[0_18px_45px_rgba(37,99,235,0.08)] transition-all duration-300 hover:border-[#bfd7ff] hover:shadow-[0_22px_55px_rgba(37,99,235,0.14)]">
+        <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${visual.gradient} shadow-lg shadow-blue-200/50`}>
+          <Icon className="h-8 w-8 text-white" />
+        </div>
+        <h3 className="text-[1.05rem] font-medium text-slate-900">{card.name}</h3>
+        <p className="mx-auto mt-2 max-w-[180px] text-sm leading-6 text-slate-500">{card.description}</p>
+        <div className="mt-4 inline-flex items-center rounded-full bg-[#dbeafe] px-3 py-1 text-xs font-medium text-[#1d4ed8]">
+          {card.badgeText}
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
 export function ServiceCategories({
-  categories,
+  cards,
   isLoading = false,
   error = null,
-  onCategorySelect,
+  onServiceSelect,
 }: ServiceCategoriesProps) {
+  const [cardsPerPage, setCardsPerPage] = useState(getCardsPerPage);
+  const [activePage, setActivePage] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setCardsPerPage(getCardsPerPage());
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const shouldAutoRotate = cards.length > cardsPerPage;
+  const carouselPages = useMemo(() => {
+    if (!shouldAutoRotate) {
+      return [];
+    }
+
+    return Array.from({ length: cards.length }, (_, startIndex) => (
+      Array.from({ length: cardsPerPage }, (_, offset) => cards[(startIndex + offset) % cards.length])
+    ));
+  }, [cards, cardsPerPage, shouldAutoRotate]);
+
+  useEffect(() => {
+    setActivePage(0);
+  }, [cards.length, cardsPerPage]);
+
+  useEffect(() => {
+    if (!shouldAutoRotate || carouselPages.length <= 1) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActivePage((current) => (current + 1) % carouselPages.length);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [carouselPages.length, shouldAutoRotate]);
+
   return (
     <section className="bg-white py-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -45,11 +130,9 @@ export function ServiceCategories({
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="mb-4 text-3xl text-[var(--primary)] sm:text-4xl">
-            Browse by Service
-          </h2>
-          <p className="mx-auto max-w-2xl text-lg text-[var(--muted-foreground)]">
-            Browse live service categories coming directly from the marketplace database
+          <h2 className="text-3xl text-slate-900 sm:text-5xl">Browse by Service</h2>
+          <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-slate-500">
+            Find the perfect professional for your needs from our diverse range of creative services
           </p>
         </motion.div>
 
@@ -58,62 +141,44 @@ export function ServiceCategories({
             {error}
           </div>
         ) : isLoading ? (
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-6">
             {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} className="h-48 animate-pulse rounded-3xl bg-[var(--blue-50)]" />
+              <div key={index} className="h-56 animate-pulse rounded-[28px] bg-[#eef4ff]" />
             ))}
           </div>
-        ) : categories.length === 0 ? (
+        ) : cards.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-[var(--blue-200)] bg-[var(--blue-50)] px-6 py-10 text-center text-[var(--muted-foreground)]">
-            Service categories will appear here once active listings are available in the database.
+            Browse-by-service cards will appear here once the super admin activates them.
+          </div>
+        ) : shouldAutoRotate ? (
+          <div className="overflow-hidden">
+            <motion.div
+              className="flex"
+              animate={{ x: `${-activePage * 100}%` }}
+              transition={{ duration: 0.7, ease: "easeInOut" }}
+            >
+              {carouselPages.map((pageCards, pageIndex) => (
+                <div key={pageIndex} className="min-w-full">
+                  <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-6">
+                    {pageCards.map((card, cardIndex) => (
+                      <ServiceCard key={`${card.id}-${pageIndex}-${cardIndex}`} card={card} onSelect={onServiceSelect} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
           </div>
         ) : (
           <motion.div
-            className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-6"
+            className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-6"
             variants={container}
             initial="hidden"
             whileInView="show"
             viewport={{ once: true }}
           >
-            {categories.map((category) => {
-              const visual = getServiceCategoryVisual(category.name);
-              const Icon = visual.icon;
-
-              return (
-                <motion.button
-                  key={category.id}
-                  type="button"
-                  variants={item}
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => onCategorySelect?.(category.name)}
-                  className="text-left"
-                >
-                  <div className="group relative h-full overflow-hidden rounded-3xl border-2 border-transparent bg-gradient-to-br from-white to-[var(--blue-50)] p-6 text-center transition-all hover:border-[var(--blue-300)] hover:shadow-xl hover:shadow-blue-100/50">
-                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-[var(--blue-100)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
-                    <div className="relative">
-                      <motion.div
-                        className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${visual.gradient} shadow-lg`}
-                        whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <Icon className="h-8 w-8 text-white" />
-                      </motion.div>
-                      <h3 className="mb-1.5 text-sm text-[var(--primary)] transition-colors">
-                        {category.name}
-                      </h3>
-                      <p className="mb-2 text-xs text-[var(--muted-foreground)]">
-                        {visual.description}
-                      </p>
-                      <div className="inline-flex items-center gap-1 rounded-full bg-[var(--blue-100)] px-2.5 py-1 text-xs text-[var(--blue-700)]">
-                        {compactNumberFormatter.format(category.listingCount)} listings
-                      </div>
-                    </div>
-                  </div>
-                </motion.button>
-              );
-            })}
+            {cards.map((card) => (
+              <ServiceCard key={card.id} card={card} onSelect={onServiceSelect} />
+            ))}
           </motion.div>
         )}
       </div>

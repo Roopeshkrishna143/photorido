@@ -6,12 +6,14 @@ import { attachRealtimeServer } from "./realtime/socket.js";
 import { seedDefaultUsers } from "./startup/seed-default-users.js";
 import { syncMongoDbExportsOnBoot } from "./startup/sync-mongodb-exports.js";
 import { seedRbac } from "./startup/seed-rbac.js";
+import { seedBrowseServices } from "./startup/seed-browse-services.js";
 
 async function startServer() {
   await connectToDatabase();
   // await syncMongoDbExportsOnBoot();
   await seedDefaultUsers();
   await seedRbac();
+  await seedBrowseServices();
 
   const app = createApp();
   const httpServer = createServer(app);

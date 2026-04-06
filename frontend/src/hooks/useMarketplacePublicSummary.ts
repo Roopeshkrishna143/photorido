@@ -10,6 +10,13 @@ export interface MarketplacePublicStats {
   activeCategories: number;
 }
 
+export interface HomeBrowseServiceCard {
+  id: string;
+  name: string;
+  description: string;
+  badgeText: string;
+}
+
 export interface MarketplacePublicServiceCategory {
   id: string;
   name: string;
@@ -18,6 +25,7 @@ export interface MarketplacePublicServiceCategory {
 
 export interface MarketplacePublicSummary {
   stats: MarketplacePublicStats;
+  browseServiceCards: HomeBrowseServiceCard[];
   serviceCategories: MarketplacePublicServiceCategory[];
   trendingSearches: string[];
 }
@@ -31,6 +39,7 @@ const EMPTY_SUMMARY: MarketplacePublicSummary = {
     averageRating: 0,
     activeCategories: 0,
   },
+  browseServiceCards: [],
   serviceCategories: [],
   trendingSearches: [],
 };
@@ -62,6 +71,7 @@ function normalizeSummary(payload: unknown): MarketplacePublicSummary {
   const raw = unwrapPayload<unknown>(payload);
   const record = isRecord(raw) ? raw : {};
   const statsRecord = isRecord(record.stats) ? record.stats : {};
+  const browseServicesSource = Array.isArray(record.browseServiceCards) ? record.browseServiceCards : [];
   const categoriesSource = Array.isArray(record.serviceCategories) ? record.serviceCategories : [];
   const trendingSource = Array.isArray(record.trendingSearches) ? record.trendingSearches : [];
 
@@ -74,6 +84,28 @@ function normalizeSummary(payload: unknown): MarketplacePublicSummary {
       averageRating: asNumber(statsRecord.averageRating),
       activeCategories: asNumber(statsRecord.activeCategories),
     },
+    browseServiceCards: browseServicesSource
+      .map((entry) => {
+        if (!isRecord(entry)) {
+          return null;
+        }
+
+        const id = asString(entry.id) || asString(entry._id);
+        const name = asString(entry.name);
+        const description = asString(entry.description);
+        const badgeText = asString(entry.badgeText);
+        if (!id || !name || !description || !badgeText) {
+          return null;
+        }
+
+        return {
+          id,
+          name,
+          description,
+          badgeText,
+        } satisfies HomeBrowseServiceCard;
+      })
+      .filter((entry): entry is HomeBrowseServiceCard => entry !== null),
     serviceCategories: categoriesSource
       .map((entry) => {
         if (!isRecord(entry)) {

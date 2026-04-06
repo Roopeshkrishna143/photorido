@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Settings,
   ShieldCheck,
+  Sparkles,
   Star,
   Tags,
   Users,
@@ -51,6 +52,7 @@ const SUPER_ADMIN_NAV: NavCategory[] = [
     title: "Management",
     items: [
       { label: "Categories", icon: Tags, key: "categories" },
+      { label: "Browse Services", icon: Sparkles, key: "browse-services" },
       { label: "Sub-Categories", icon: Layers, key: "sub-categories" },
       { label: "User Management", icon: Users, key: "user-management" },
       { label: "User Profiles List", icon: ClipboardCheck, key: "listings" },

@@ -4,6 +4,7 @@ import {
   type BookingStatus,
   type MarketplaceBookingDocument,
 } from "../../models/booking.model.js";
+import { type BrowseServiceCardDocument } from "../../models/browse-service-card.model.js";
 import { CategoryModel, type CategoryDocument } from "../../models/category.model.js";
 import {
   MarketplaceNotificationModel,
@@ -75,6 +76,18 @@ export function serializeCategory(category: CategoryDocument) {
     name: category.name,
     status: category.status,
     createdAt: toIsoString(category.createdAt),
+  };
+}
+
+export function serializeBrowseServiceCard(card: BrowseServiceCardDocument) {
+  return {
+    id: card.id,
+    name: card.name,
+    description: card.description,
+    badgeText: card.badgeText,
+    sortOrder: card.sortOrder,
+    status: card.status,
+    createdAt: toIsoString(card.createdAt),
   };
 }
 

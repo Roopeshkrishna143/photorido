@@ -1,8 +1,16 @@
+import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
 import { MarketplaceBookingModel } from "../../models/booking.model.js";
 import { MarketplaceReviewModel } from "../../models/review.model.js";
 import { UserModel } from "../../models/user.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
+
+interface HomeBrowseServiceCard {
+  id: string;
+  name: string;
+  description: string;
+  badgeText: string;
+}
 
 interface HomeServiceCategory {
   id: string;
@@ -21,6 +29,7 @@ interface HomeSummaryStats {
 
 export interface HomeSummaryPayload {
   stats: HomeSummaryStats;
+  browseServiceCards: HomeBrowseServiceCard[];
   serviceCategories: HomeServiceCategory[];
   trendingSearches: string[];
 }
@@ -42,6 +51,7 @@ function roundRating(value: number) {
 export async function buildHomeSummary() {
   const [
     activeCategories,
+    activeBrowseServiceCards,
     approvedProfilesCount,
     activeVendorsCount,
     completedBookingsCount,
@@ -52,24 +62,14 @@ export async function buildHomeSummary() {
     trendingSubCategories,
   ] = await Promise.all([
     CategoryModel.find({ status: "active" }).sort({ name: 1 }).select("_id name").lean(),
+    BrowseServiceCardModel.find({ status: "active" }).sort({ sortOrder: 1, name: 1, createdAt: -1 }).lean(),
     VendorProfileModel.countDocuments({ status: "approved" }),
     UserModel.countDocuments({ role: "vendor", status: "active" }),
     MarketplaceBookingModel.countDocuments({ status: "completed" }),
     MarketplaceReviewModel.countDocuments(),
-    MarketplaceReviewModel.aggregate<{ _id: null; averageRating: number }>([
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-        },
-      },
-    ]),
-    VendorProfileModel.aggregate<{ _id: { categoryId: string; category: string }; listingCount: number }>([
-      {
-        $match: {
-          status: "approved",
-        },
-      },
+    MarketplaceReviewModel.aggregate([{ $group: { _id: null, averageRating: { $avg: "$rating" } } }]),
+    VendorProfileModel.aggregate([
+      { $match: { status: "approved" } },
       {
         $group: {
           _id: {
@@ -86,50 +86,25 @@ export async function buildHomeSummary() {
         },
       },
     ]),
-    VendorProfileModel.aggregate<{ _id: string; listingCount: number }>([
-      {
-        $match: {
-          status: "approved",
-          category: { $type: "string", $ne: "" },
-        },
-      },
-      {
-        $group: {
-          _id: "$category",
-          listingCount: { $sum: 1 },
-        },
-      },
-      {
-        $sort: {
-          listingCount: -1,
-          _id: 1,
-        },
-      },
+    VendorProfileModel.aggregate([
+      { $match: { status: "approved", category: { $type: "string", $ne: "" } } },
+      { $group: { _id: "$category", listingCount: { $sum: 1 } } },
+      { $sort: { listingCount: -1, _id: 1 } },
     ]),
-    VendorProfileModel.aggregate<{ _id: string; listingCount: number }>([
-      {
-        $match: {
-          status: "approved",
-          subCategory: { $type: "string", $ne: "" },
-        },
-      },
-      {
-        $group: {
-          _id: "$subCategory",
-          listingCount: { $sum: 1 },
-        },
-      },
-      {
-        $sort: {
-          listingCount: -1,
-          _id: 1,
-        },
-      },
-      {
-        $limit: 6,
-      },
+    VendorProfileModel.aggregate([
+      { $match: { status: "approved", subCategory: { $type: "string", $ne: "" } } },
+      { $group: { _id: "$subCategory", listingCount: { $sum: 1 } } },
+      { $sort: { listingCount: -1, _id: 1 } },
+      { $limit: 6 },
     ]),
   ]);
+
+  const browseServiceCards: HomeBrowseServiceCard[] = activeBrowseServiceCards.map((card) => ({
+    id: String(card._id),
+    name: card.name,
+    description: card.description,
+    badgeText: card.badgeText,
+  }));
 
   const listingCountByCategoryId = new Map(
     categoryCounts.map((entry) => [String(entry._id.categoryId), entry.listingCount]),
@@ -154,6 +129,7 @@ export async function buildHomeSummary() {
 
   const trendingSearches = uniqueNonEmpty([
     ...trendingSubCategories.map((entry) => entry._id),
+    ...browseServiceCards.map((card) => card.name),
     ...serviceCategories.map((category) => category.name),
   ]).slice(0, 6);
 
@@ -166,6 +142,7 @@ export async function buildHomeSummary() {
       averageRating: roundRating(ratingStats[0]?.averageRating ?? 0),
       activeCategories: activeCategories.length || serviceCategories.length,
     },
+    browseServiceCards,
     serviceCategories: serviceCategories.slice(0, 12),
     trendingSearches,
   } satisfies HomeSummaryPayload;

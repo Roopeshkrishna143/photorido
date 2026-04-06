@@ -5,6 +5,7 @@ import {
   BookingStatus,
   ListingStatus,
   ManagedUserRole,
+  MarketplaceBrowseServiceCard,
   MarketplaceCategory,
   MarketplaceReview,
   MarketplacePermission,
@@ -20,6 +21,7 @@ import {
   LayoutDashboard,
   Pencil,
   Plus,
+  Sparkles,
   Star,
   Trash2,
   TrendingUp,
@@ -33,6 +35,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SettingsPage } from "./SettingsPage";
 import { Input } from "../ui/input";
 import { api, unwrapPayload } from "../../lib/api";
+import { getServiceCategoryVisual } from "../../lib/public-marketplace";
 import { showConfirmAlert, showErrorAlert, showSuccessAlert } from "../../lib/alerts";
 
 const FIELD_CLASS =
@@ -1421,7 +1424,7 @@ function RolesPage() {
                   <p className="mt-3 text-sm text-gray-500">
                     {role.systemRole
                       ? `${roleLabel(role.systemRole)} login role`
-                      : "Custom role definition"} • {role.permissionIds.length} permission{role.permissionIds.length === 1 ? "" : "s"} attached
+                      : "Custom role definition"} Ã¢â‚¬Â¢ {role.permissionIds.length} permission{role.permissionIds.length === 1 ? "" : "s"} attached
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {role.permissionIds.map((permissionId) => (
@@ -1519,6 +1522,142 @@ function CategoriesPage() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+const defaultBrowseServiceForm = {
+  name: "",
+  description: "",
+  badgeText: "",
+  sortOrder: 0,
+  status: "active" as MarketplaceBrowseServiceCard["status"],
+};
+
+function BrowseServicesPage() {
+  const {
+    browseServiceCards,
+    addBrowseServiceCard,
+    updateBrowseServiceCard,
+    deleteBrowseServiceCard,
+  } = useMarketplace();
+  const [filter, setFilter] = useState<"all" | MarketplaceBrowseServiceCard["status"]>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(defaultBrowseServiceForm);
+
+  const filteredCards = (filter === "all"
+    ? browseServiceCards
+    : browseServiceCards.filter((card) => card.status === filter)
+  ).slice().sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    const succeeded = editingId
+      ? await updateBrowseServiceCard(editingId, form)
+      : await addBrowseServiceCard(form);
+
+    if (!succeeded) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm(defaultBrowseServiceForm);
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Browse Services"
+        description="Manage the home-page Browse by Service cards independently from marketplace categories."
+      />
+      <FilterChips
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { label: "All", value: "all" },
+          { label: "Active", value: "active" },
+          { label: "Inactive", value: "inactive" },
+        ]}
+      />
+      <Card className="border border-gray-100 shadow-sm">
+        <CardContent className="pt-6">
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+              <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Service title" className="rounded-xl border-gray-200" />
+              <Input value={form.badgeText} onChange={(event) => setForm((current) => ({ ...current, badgeText: event.target.value }))} placeholder="Badge text (e.g. 12.5K+ pros)" className="rounded-xl border-gray-200" />
+              <Input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm((current) => ({ ...current, sortOrder: Number(event.target.value) || 0 }))} placeholder="Sort order" className="rounded-xl border-gray-200" />
+              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as MarketplaceBrowseServiceCard["status"] }))} className={FIELD_CLASS}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">{editingId ? "Update" : "Create"}</Button>
+            </div>
+            <textarea
+              value={form.description}
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              placeholder="Short description shown under the service title"
+              className={`${FIELD_CLASS} min-h-[96px] py-3`}
+            />
+          </form>
+        </CardContent>
+      </Card>
+
+      {filteredCards.length === 0 ? (
+        <EmptyState title="No browse services yet" description="Create the first Browse by Service card to control the home page section." />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredCards.map((card) => {
+            const visual = getServiceCategoryVisual(card.name);
+            const Icon = visual.icon;
+
+            return (
+              <Card key={card.id} className="border border-gray-100 shadow-sm">
+                <CardContent className="space-y-4 pt-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">{card.name}</p>
+                      <p className="mt-1 text-xs text-gray-400">Created {formatDate(card.createdAt)} - Order {card.sortOrder}</p>
+                    </div>
+                    <ScopeBadge className={statusClass(card.status)}>{card.status}</ScopeBadge>
+                  </div>
+
+                  <div className="rounded-[28px] border border-[#e7f0ff] bg-gradient-to-b from-white to-[#f6f9ff] px-6 py-7 text-center shadow-[0_18px_45px_rgba(37,99,235,0.08)]">
+                    <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${visual.gradient} shadow-lg shadow-blue-200/50`}>
+                      <Icon className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-[1.05rem] font-medium text-slate-900">{card.name}</h3>
+                    <p className="mx-auto mt-2 max-w-[220px] text-sm leading-6 text-slate-500">{card.description}</p>
+                    <div className="mt-4 inline-flex items-center rounded-full bg-[#dbeafe] px-3 py-1 text-xs font-medium text-[#1d4ed8]">
+                      {card.badgeText}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => {
+                      setEditingId(card.id);
+                      setForm({
+                        name: card.name,
+                        description: card.description,
+                        badgeText: card.badgeText,
+                        sortOrder: card.sortOrder,
+                        status: card.status,
+                      });
+                    }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1 rounded-xl text-red-600" onClick={() => deleteBrowseServiceCard(card.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1658,7 +1797,7 @@ function ListingsPage() {
                   <p className="mt-3 text-sm text-gray-700">{listing.description}</p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                     <span>{listing.price}</span>
-                    <span>•</span>
+                    <span>Ã¢â‚¬Â¢</span>
                     <span>Submitted {formatDateTime(listing.createdAt)}</span>
                   </div>
                   <div className="mt-5 flex items-center gap-2">
@@ -1736,6 +1875,8 @@ export function SuperAdminDashboard() {
         return <RolesPage />;
       case "categories":
         return <CategoriesPage />;
+      case "browse-services":
+        return <BrowseServicesPage />;
       case "sub-categories":
         return <SubCategoriesPage />;
       case "listings":

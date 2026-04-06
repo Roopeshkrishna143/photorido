@@ -158,10 +158,10 @@ export function HomePage() {
 
       <div id="services-section">
         <ServiceCategories
-          categories={summary.serviceCategories}
+          cards={summary.browseServiceCards}
           isLoading={isSummaryLoading}
           error={summaryError}
-          onCategorySelect={(service) => handleSearch({ service, location: "", date: "" })}
+          onServiceSelect={(service) => handleSearch({ service, location: "", date: "" })}
         />
       </div>
 

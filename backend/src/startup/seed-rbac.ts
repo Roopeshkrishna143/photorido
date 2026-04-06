@@ -68,6 +68,14 @@ const DEFAULT_PERMISSIONS = [
     isProtected: true,
   },
   {
+    name: "manage_browse_services",
+    module: "browse-services",
+    audience: "super-admin",
+    description: "Manage the Browse by Service cards shown on the home page.",
+    status: "active",
+    isProtected: true,
+  },
+  {
     name: "moderate_profiles",
     module: "profiles",
     audience: "super-admin",

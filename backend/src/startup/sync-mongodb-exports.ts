@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Types } from "mongoose";
+import { BrowseServiceCardModel } from "../models/browse-service-card.model.js";
 import { CategoryModel } from "../models/category.model.js";
 import { ContactInquiryModel } from "../models/contact-inquiry.model.js";
 import { FavoriteModel } from "../models/favorite.model.js";
@@ -33,6 +34,7 @@ const EXPORT_SYNC_TARGETS: ExportSyncTarget[] = [
   { fileName: "photorido.marketplacepermissions.json", model: MarketplacePermissionModel },
   { fileName: "photorido.marketplaceroledefinitions.json", model: MarketplaceRoleDefinitionModel },
   { fileName: "photorido.categories.json", model: CategoryModel },
+  { fileName: "photorido.browseservicecards.json", model: BrowseServiceCardModel },
   { fileName: "photorido.subcategories.json", model: SubCategoryModel },
   { fileName: "photorido.vendorprofiles.json", model: VendorProfileModel },
   { fileName: "photorido.marketplacebookings.json", model: MarketplaceBookingModel },

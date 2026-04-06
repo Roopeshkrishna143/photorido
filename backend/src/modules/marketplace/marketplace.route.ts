@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
 import { UserModel } from "../../models/user.model.js";
+import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
 import { SubCategoryModel } from "../../models/sub-category.model.js";
 import { MarketplaceNotificationModel } from "../../models/notification.model.js";
@@ -17,6 +18,7 @@ import {
   NOTIFICATION_TARGET_PATHS,
   notifyAllSuperAdmins,
   resolveLocationInput,
+  serializeBrowseServiceCard,
   serializeCategory,
   serializeMarketplaceListing,
   serializeNotification,
@@ -27,6 +29,14 @@ import {
 
 const categorySchema = z.object({
   name: z.string().trim().min(1, "Category name is required."),
+  status: z.enum(["active", "inactive"]).default("active"),
+});
+
+const browseServiceCardSchema = z.object({
+  name: z.string().trim().min(1, "Service name is required."),
+  description: z.string().trim().min(1, "Description is required."),
+  badgeText: z.string().trim().min(1, "Badge text is required."),
+  sortOrder: z.coerce.number().int().min(0).default(0),
   status: z.enum(["active", "inactive"]).default("active"),
 });
 
@@ -255,6 +265,96 @@ marketplaceRouter.delete(
     response.status(200).json({
       success: true,
       message: "Category deleted successfully.",
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/browse-services",
+  asyncHandler(async (_request, response) => {
+    const browseServiceCards = await BrowseServiceCardModel.find().sort({ sortOrder: 1, name: 1, createdAt: -1 });
+
+    response.status(200).json({
+      success: true,
+      data: browseServiceCards.map((card) => serializeBrowseServiceCard(card)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/browse-services",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = browseServiceCardSchema.parse(request.body);
+    const existing = await BrowseServiceCardModel.findOne({ name: input.name });
+    if (existing) {
+      throw new HttpError(409, "A browse-by-service card with this name already exists.");
+    }
+
+    const browseServiceCard = await BrowseServiceCardModel.create({
+      ...input,
+      createdByUserId: request.authUser.id,
+    });
+
+    response.status(201).json({
+      success: true,
+      message: "Browse by service card created successfully.",
+      data: serializeBrowseServiceCard(browseServiceCard),
+    });
+  }),
+);
+
+marketplaceRouter.patch(
+  "/browse-services/:browseServiceCardId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const input = browseServiceCardSchema.parse(request.body);
+    const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
+    if (!browseServiceCard) {
+      throw new HttpError(404, "Browse by service card not found.");
+    }
+
+    const duplicate = await BrowseServiceCardModel.findOne({
+      name: input.name,
+      _id: { $ne: browseServiceCard.id },
+    });
+    if (duplicate) {
+      throw new HttpError(409, "A browse-by-service card with this name already exists.");
+    }
+
+    browseServiceCard.name = input.name;
+    browseServiceCard.description = input.description;
+    browseServiceCard.badgeText = input.badgeText;
+    browseServiceCard.sortOrder = input.sortOrder;
+    browseServiceCard.status = input.status;
+    await browseServiceCard.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Browse by service card updated successfully.",
+      data: serializeBrowseServiceCard(browseServiceCard),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/browse-services/:browseServiceCardId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
+    if (!browseServiceCard) {
+      throw new HttpError(404, "Browse by service card not found.");
+    }
+
+    await browseServiceCard.deleteOne();
+
+    response.status(200).json({
+      success: true,
+      message: "Browse by service card deleted successfully.",
     });
   }),
 );

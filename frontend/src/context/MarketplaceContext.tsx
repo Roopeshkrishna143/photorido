@@ -133,6 +133,16 @@ export interface MarketplaceCategory {
   createdAt: string;
 }
 
+export interface MarketplaceBrowseServiceCard {
+  id: string;
+  name: string;
+  description: string;
+  badgeText: string;
+  sortOrder: number;
+  status: "active" | "inactive";
+  createdAt: string;
+}
+
 export interface MarketplaceSubCategory {
   id: string;
   categoryId: string;
@@ -291,6 +301,14 @@ interface CreateCategoryInput {
   status: MarketplaceCategory["status"];
 }
 
+interface CreateBrowseServiceCardInput {
+  name: string;
+  description: string;
+  badgeText: string;
+  sortOrder: number;
+  status: MarketplaceBrowseServiceCard["status"];
+}
+
 interface CreateSubCategoryInput {
   categoryId: string;
   name: string;
@@ -306,6 +324,7 @@ interface MarketplaceSnapshot {
   permissions: MarketplacePermission[];
   roles: MarketplaceRoleDefinition[];
   categories: MarketplaceCategory[];
+  browseServiceCards: MarketplaceBrowseServiceCard[];
   subCategories: MarketplaceSubCategory[];
   listings: MarketplaceListing[];
 }
@@ -353,6 +372,9 @@ interface MarketplaceContextValue extends MarketplaceSnapshot {
   addCategory: (input: CreateCategoryInput) => MarketplaceMutationResult;
   updateCategory: (categoryId: string, input: CreateCategoryInput) => MarketplaceMutationResult;
   deleteCategory: (categoryId: string) => MarketplaceMutationResult;
+  addBrowseServiceCard: (input: CreateBrowseServiceCardInput) => MarketplaceMutationResult;
+  updateBrowseServiceCard: (browseServiceCardId: string, input: CreateBrowseServiceCardInput) => MarketplaceMutationResult;
+  deleteBrowseServiceCard: (browseServiceCardId: string) => MarketplaceMutationResult;
   addSubCategory: (input: CreateSubCategoryInput) => MarketplaceMutationResult;
   updateSubCategory: (subCategoryId: string, input: CreateSubCategoryInput) => MarketplaceMutationResult;
   deleteSubCategory: (subCategoryId: string) => MarketplaceMutationResult;
@@ -367,6 +389,7 @@ const EMPTY_SNAPSHOT: MarketplaceSnapshot = {
   permissions: [],
   roles: [],
   categories: [],
+  browseServiceCards: [],
   subCategories: [],
   listings: [],
 };
@@ -380,6 +403,7 @@ const RESOURCE_ENDPOINTS = {
   permissions: "/marketplace/permissions",
   roles: "/marketplace/roles",
   categories: "/marketplace/categories",
+  browseServiceCards: "/marketplace/browse-services",
   subCategories: "/marketplace/sub-categories",
   listings: "/marketplace/listings",
 } satisfies Record<keyof MarketplaceSnapshot, string>;
@@ -396,6 +420,7 @@ const ROLE_RESOURCE_MAP: Record<ManagedUserRole, (keyof MarketplaceSnapshot)[]> 
     "permissions",
     "roles",
     "categories",
+    "browseServiceCards",
     "subCategories",
     "listings",
   ],
@@ -670,6 +695,12 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
         runMutation(() => api.patch(`${RESOURCE_ENDPOINTS.categories}/${categoryId}`, input)),
       deleteCategory: (categoryId) =>
         runMutation(() => api.delete(`${RESOURCE_ENDPOINTS.categories}/${categoryId}`)),
+      addBrowseServiceCard: (input) =>
+        runMutation(() => api.post(RESOURCE_ENDPOINTS.browseServiceCards, input)),
+      updateBrowseServiceCard: (browseServiceCardId, input) =>
+        runMutation(() => api.patch(`${RESOURCE_ENDPOINTS.browseServiceCards}/${browseServiceCardId}`, input)),
+      deleteBrowseServiceCard: (browseServiceCardId) =>
+        runMutation(() => api.delete(`${RESOURCE_ENDPOINTS.browseServiceCards}/${browseServiceCardId}`)),
       addSubCategory: (input) =>
         runMutation(() => api.post(RESOURCE_ENDPOINTS.subCategories, input)),
       updateSubCategory: (subCategoryId, input) =>
