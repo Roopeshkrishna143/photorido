@@ -5,11 +5,6 @@ import { UserModel } from "../../models/user.model.js";
 import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
 import { SubCategoryModel } from "../../models/sub-category.model.js";
-import {
-  SEARCH_ADVERTISEMENT_PLACEMENTS,
-  SEARCH_ADVERTISEMENT_STATUSES,
-  SearchAdvertisementModel,
-} from "../../models/search-advertisement.model.js";
 import { MarketplaceNotificationModel } from "../../models/notification.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
 import { asyncHandler } from "../../utils/async-handler.js";
@@ -28,7 +23,6 @@ import {
   serializeMarketplaceListing,
   serializeNotification,
   serializePlatformUser,
-  serializeSearchAdvertisement,
   serializeSubCategory,
   validateCategoryAndSubCategory,
 } from "./marketplace.service.js";
@@ -44,18 +38,6 @@ const browseServiceCardSchema = z.object({
   badgeText: z.string().trim().min(1, "Badge text is required."),
   sortOrder: z.coerce.number().int().min(0).default(0),
   status: z.enum(["active", "inactive"]).default("active"),
-});
-
-const searchAdvertisementSchema = z.object({
-  title: z.string().trim().min(1, "Ad title is required."),
-  description: z.string().trim().min(1, "Description is required."),
-  imageUrl: z.string().trim().default(""),
-  ctaLabel: z.string().trim().default("Learn more"),
-  ctaUrl: z.string().trim().default(""),
-  locationLabel: z.string().trim().default(""),
-  sortOrder: z.coerce.number().int().min(0).default(0),
-  status: z.enum(SEARCH_ADVERTISEMENT_STATUSES).default("active"),
-  placement: z.enum(SEARCH_ADVERTISEMENT_PLACEMENTS).default("search-results"),
 });
 
 const subCategorySchema = z.object({
@@ -373,97 +355,6 @@ marketplaceRouter.delete(
     response.status(200).json({
       success: true,
       message: "Browse by service card deleted successfully.",
-    });
-  }),
-);
-
-marketplaceRouter.get(
-  "/advertisements",
-  authorizeRoles("super-admin"),
-  asyncHandler(async (_request, response) => {
-    const advertisements = await SearchAdvertisementModel.find().sort({
-      placement: 1,
-      sortOrder: 1,
-      createdAt: -1,
-    });
-
-    response.status(200).json({
-      success: true,
-      data: advertisements.map((advertisement) => serializeSearchAdvertisement(advertisement)),
-    });
-  }),
-);
-
-marketplaceRouter.post(
-  "/advertisements",
-  authorizeRoles("super-admin"),
-  asyncHandler(async (request: AuthenticatedRequest, response) => {
-    if (!request.authUser) {
-      throw new HttpError(401, "Authentication is required.");
-    }
-
-    const input = searchAdvertisementSchema.parse(request.body);
-    const advertisement = await SearchAdvertisementModel.create({
-      ...input,
-      createdByUserId: request.authUser.id,
-    });
-
-    response.status(201).json({
-      success: true,
-      message: "Advertisement created successfully.",
-      data: serializeSearchAdvertisement(advertisement),
-    });
-  }),
-);
-
-marketplaceRouter.patch(
-  "/advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
-  asyncHandler(async (request: AuthenticatedRequest, response) => {
-    if (!request.authUser) {
-      throw new HttpError(401, "Authentication is required.");
-    }
-
-    const input = searchAdvertisementSchema.parse(request.body);
-    const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
-    if (!advertisement) {
-      throw new HttpError(404, "Advertisement not found.");
-    }
-
-    advertisement.title = input.title;
-    advertisement.description = input.description;
-    advertisement.imageUrl = input.imageUrl;
-    advertisement.ctaLabel = input.ctaLabel;
-    advertisement.ctaUrl = input.ctaUrl;
-    advertisement.locationLabel = input.locationLabel;
-    advertisement.sortOrder = input.sortOrder;
-    advertisement.status = input.status;
-    advertisement.placement = input.placement;
-    advertisement.updatedByUserId = request.authUser.id;
-    await advertisement.save();
-
-    response.status(200).json({
-      success: true,
-      message: "Advertisement updated successfully.",
-      data: serializeSearchAdvertisement(advertisement),
-    });
-  }),
-);
-
-marketplaceRouter.delete(
-  "/advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
-  asyncHandler(async (request, response) => {
-    const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
-    if (!advertisement) {
-      throw new HttpError(404, "Advertisement not found.");
-    }
-
-    await advertisement.deleteOne();
-
-    response.status(200).json({
-      success: true,
-      message: "Advertisement deleted successfully.",
     });
   }),
 );

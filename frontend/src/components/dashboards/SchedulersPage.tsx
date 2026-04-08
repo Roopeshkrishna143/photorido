@@ -1,17 +1,9 @@
 import { useMemo } from "react";
 import { CalendarDays, CheckCircle2, Clock3, MapPin, Phone, UserRound } from "lucide-react";
 import { useMarketplace, type BookingStatus, type MarketplaceBooking } from "../../context/MarketplaceContext";
+import { formatDisplayDate } from "../../lib/date";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-
-function formatDisplayDate(date: string) {
-  return new Date(date).toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function isActiveBooking(status: BookingStatus) {
   return status === "pending" || status === "approved_by_vendor" || status === "confirmed";

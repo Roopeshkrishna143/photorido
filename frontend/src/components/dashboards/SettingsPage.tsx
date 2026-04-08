@@ -306,6 +306,7 @@ export function SettingsPage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarDraft, setAvatarDraft] = useState<AvatarDraft | null>(null);
   const [avatarCrop, setAvatarCrop] = useState<CropState>(DEFAULT_AVATAR_CROP);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
 
   useEffect(() => {
     setProfileForm({
@@ -314,6 +315,7 @@ export function SettingsPage() {
       location: user?.location ?? "",
       avatar: user?.avatar ?? "",
     });
+    setAvatarPreviewUrl(user?.avatar ?? "");
   }, [user?.avatar, user?.location, user?.name, user?.phoneNumber]);
 
   useEffect(() => {
@@ -333,13 +335,18 @@ export function SettingsPage() {
     if (user?.role === "vendor") return "Vendor";
     return "User";
   }, [user?.role]);
-  const displayAvatar = avatarDraft?.previewUrl || profileForm.avatar;
+  const displayAvatar = avatarDraft?.previewUrl || avatarPreviewUrl || profileForm.avatar;
 
   const profileReadiness = user?.profileComplete ? "Profile Ready" : "Needs Attention";
 
   const closeAvatarEditor = () => {
     setAvatarDraft(null);
     setAvatarCrop(DEFAULT_AVATAR_CROP);
+    setAvatarPreviewUrl((current) =>
+      current.startsWith("blob:")
+        ? (profileForm.avatar || user?.avatar || "")
+        : current,
+    );
   };
 
   const handleProfileSave = async () => {
@@ -397,6 +404,7 @@ export function SettingsPage() {
         previewUrl,
       };
     });
+    setAvatarPreviewUrl(previewUrl);
     setAvatarCrop(DEFAULT_AVATAR_CROP);
     event.target.value = "";
   };
@@ -417,6 +425,7 @@ export function SettingsPage() {
 
       await updateProfile({ avatar: uploadedUrl });
       setProfileForm((current) => ({ ...current, avatar: uploadedUrl }));
+      setAvatarPreviewUrl(uploadedUrl);
       closeAvatarEditor();
       await showSuccessAlert("Profile image updated", {
         text: "Your new profile image is live now.",

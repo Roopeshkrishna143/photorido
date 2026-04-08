@@ -18,7 +18,6 @@ import {
   MarketplaceReviewModel,
   type MarketplaceReviewDocument,
 } from "../../models/review.model.js";
-import { type SearchAdvertisementDocument } from "../../models/search-advertisement.model.js";
 import {
   MarketplaceRoleDefinitionModel,
   type MarketplaceRoleDefinitionDocument,
@@ -89,23 +88,6 @@ export function serializeBrowseServiceCard(card: BrowseServiceCardDocument) {
     sortOrder: card.sortOrder,
     status: card.status,
     createdAt: toIsoString(card.createdAt),
-  };
-}
-
-export function serializeSearchAdvertisement(advertisement: SearchAdvertisementDocument) {
-  return {
-    id: advertisement.id,
-    title: advertisement.title,
-    description: advertisement.description,
-    imageUrl: advertisement.imageUrl,
-    ctaLabel: advertisement.ctaLabel,
-    ctaUrl: advertisement.ctaUrl,
-    locationLabel: advertisement.locationLabel,
-    placement: advertisement.placement,
-    sortOrder: advertisement.sortOrder,
-    status: advertisement.status,
-    createdAt: toIsoString(advertisement.createdAt),
-    updatedAt: toIsoString(advertisement.updatedAt),
   };
 }
 

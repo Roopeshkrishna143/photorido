@@ -2,7 +2,6 @@ import { BrowseServiceCardModel } from "../../models/browse-service-card.model.j
 import { CategoryModel } from "../../models/category.model.js";
 import { MarketplaceBookingModel } from "../../models/booking.model.js";
 import { MarketplaceReviewModel } from "../../models/review.model.js";
-import { SearchAdvertisementModel } from "../../models/search-advertisement.model.js";
 import { UserModel } from "../../models/user.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
 
@@ -33,18 +32,6 @@ export interface HomeSummaryPayload {
   browseServiceCards: HomeBrowseServiceCard[];
   serviceCategories: HomeServiceCategory[];
   trendingSearches: string[];
-}
-
-export interface SearchAdvertisementPayload {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  ctaLabel: string;
-  ctaUrl: string;
-  locationLabel: string;
-  placement: "search-results";
-  sortOrder: number;
 }
 
 function uniqueNonEmpty(values: string[]) {
@@ -159,26 +146,4 @@ export async function buildHomeSummary() {
     serviceCategories: serviceCategories.slice(0, 12),
     trendingSearches,
   } satisfies HomeSummaryPayload;
-}
-
-export async function buildSearchAdvertisements(limit = 3) {
-  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 12)) : 3;
-  const advertisements = await SearchAdvertisementModel.find({
-    status: "active",
-    placement: "search-results",
-  })
-    .sort({ sortOrder: 1, createdAt: -1 })
-    .limit(safeLimit);
-
-  return advertisements.map((advertisement) => ({
-    id: advertisement.id,
-    title: advertisement.title,
-    description: advertisement.description,
-    imageUrl: advertisement.imageUrl,
-    ctaLabel: advertisement.ctaLabel,
-    ctaUrl: advertisement.ctaUrl,
-    locationLabel: advertisement.locationLabel,
-    placement: advertisement.placement,
-    sortOrder: advertisement.sortOrder,
-  }) satisfies SearchAdvertisementPayload);
 }

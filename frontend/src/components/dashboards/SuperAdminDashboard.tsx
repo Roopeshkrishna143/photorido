@@ -19,11 +19,8 @@ import {
   CheckCircle2,
   ClipboardCheck,
   LayoutDashboard,
-  Loader2,
-  Megaphone,
   Pencil,
   Plus,
-  RefreshCw,
   Sparkles,
   Star,
   Trash2,
@@ -222,93 +219,6 @@ interface SuperAdminDashboardSummary {
     latestReviews: MarketplaceReview[];
   };
   recentActivities: DashboardActivityItem[];
-}
-
-type SearchAdvertisementStatus = "active" | "inactive";
-
-interface SearchAdvertisement {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  ctaLabel: string;
-  ctaUrl: string;
-  locationLabel: string;
-  placement: "search-results";
-  sortOrder: number;
-  status: SearchAdvertisementStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-const defaultSearchAdvertisementForm = {
-  title: "",
-  description: "",
-  imageUrl: "",
-  ctaLabel: "Learn more",
-  ctaUrl: "",
-  locationLabel: "",
-  sortOrder: 0,
-  status: "active" as SearchAdvertisementStatus,
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asNumber(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return 0;
-}
-
-function normalizeSearchAdvertisements(payload: unknown) {
-  const raw = unwrapPayload<unknown>(payload);
-  const source = Array.isArray(raw) ? raw : [];
-
-  return source
-    .map((entry) => {
-      if (!isRecord(entry)) {
-        return null;
-      }
-
-      const id = asString(entry.id) || asString(entry._id);
-      const title = asString(entry.title);
-      const description = asString(entry.description);
-      if (!id || !title || !description) {
-        return null;
-      }
-
-      return {
-        id,
-        title,
-        description,
-        imageUrl: asString(entry.imageUrl),
-        ctaLabel: asString(entry.ctaLabel) || "Learn more",
-        ctaUrl: asString(entry.ctaUrl),
-        locationLabel: asString(entry.locationLabel),
-        placement: "search-results" as const,
-        sortOrder: asNumber(entry.sortOrder),
-        status: asString(entry.status) === "inactive" ? "inactive" : "active",
-        createdAt: asString(entry.createdAt),
-        updatedAt: asString(entry.updatedAt),
-      } satisfies SearchAdvertisement;
-    })
-    .filter((entry): entry is SearchAdvertisement => entry !== null)
-    .sort((left, right) => left.sortOrder - right.sortOrder || left.title.localeCompare(right.title));
 }
 
 function DashboardPage() {
@@ -544,20 +454,10 @@ function DashboardPage() {
 }
 
 function BookingsPage() {
-  const { bookings, deleteBooking, updateBooking } = useMarketplace();
+  const { bookings, deleteBooking } = useMarketplace();
   const [filter, setFilter] = useState<"all" | BookingStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({
-    eventType: "",
-    location: "",
-    date: "",
-    time: "",
-    amount: "",
-    phoneNumber: "",
-    status: "pending" as BookingStatus,
-  });
 
   const filteredBookings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -605,79 +505,12 @@ function BookingsPage() {
     }
   }, [page, totalPages]);
 
-  const startEdit = (booking: ReturnType<typeof useMarketplace>["bookings"][number]) => {
-    setEditingId(booking.id);
-    setEditForm({
-      eventType: booking.eventType,
-      location: booking.location,
-      date: booking.date,
-      time: booking.time,
-      amount: booking.amount,
-      phoneNumber: booking.phoneNumber,
-      status: booking.status,
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({
-      eventType: "",
-      location: "",
-      date: "",
-      time: "",
-      amount: "",
-      phoneNumber: "",
-      status: "pending",
-    });
-  };
-
-  const saveEdit = () => {
-    if (!editingId) {
-      return;
-    }
-
-    void updateBooking(editingId, editForm).then((success) => {
-      if (success) {
-        cancelEdit();
-      }
-    });
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Vendor-User Bookings"
-        description="Search, edit, and manage every booking between users and vendors from one super-admin workspace."
+        description="Search and review every booking between users and vendors from one super-admin workspace."
       />
-
-      {editingId && (
-        <Card className="border border-blue-100 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Edit Booking</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Input value={editForm.eventType} onChange={(event) => setEditForm((current) => ({ ...current, eventType: event.target.value }))} placeholder="Event type" className="rounded-xl border-gray-200" />
-              <Input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} placeholder="Location" className="rounded-xl border-gray-200" />
-              <Input type="date" value={editForm.date} onChange={(event) => setEditForm((current) => ({ ...current, date: event.target.value }))} className="rounded-xl border-gray-200" />
-              <Input value={editForm.time} onChange={(event) => setEditForm((current) => ({ ...current, time: event.target.value }))} placeholder="Time slot" className="rounded-xl border-gray-200" />
-              <Input value={editForm.amount} onChange={(event) => setEditForm((current) => ({ ...current, amount: event.target.value }))} placeholder="Amount" className="rounded-xl border-gray-200" />
-              <Input value={editForm.phoneNumber} onChange={(event) => setEditForm((current) => ({ ...current, phoneNumber: event.target.value }))} placeholder="Phone number" className="rounded-xl border-gray-200" />
-              <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value as BookingStatus }))} className={FIELD_CLASS}>
-                <option value="pending">Pending</option>
-                <option value="approved_by_vendor">Confirmed</option>
-                <option value="rejected_by_vendor">Rejected</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={cancelEdit}>Cancel</Button>
-              <Button className="rounded-xl bg-blue-600 text-white hover:bg-blue-700" onClick={saveEdit}>Save Booking</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <FilterChips
@@ -758,10 +591,6 @@ function BookingsPage() {
                     <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">{formatDisplayDateTime(booking.updatedAt)}</td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => startEdit(booking)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </Button>
                         <Button variant="outline" size="sm" className="gap-1 rounded-xl text-red-600" onClick={() => deleteBooking(booking.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
@@ -1722,297 +1551,6 @@ function BrowseServicesPage() {
   );
 }
 
-function AdvertisementsPage() {
-  const [advertisements, setAdvertisements] = useState<SearchAdvertisement[]>([]);
-  const [filter, setFilter] = useState<"all" | SearchAdvertisementStatus>("all");
-  const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(defaultSearchAdvertisementForm);
-
-  const filteredAdvertisements = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return advertisements.filter((advertisement) => {
-      if (filter !== "all" && advertisement.status !== filter) {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      return [
-        advertisement.title,
-        advertisement.description,
-        advertisement.locationLabel,
-        advertisement.ctaLabel,
-      ]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(normalizedSearch));
-    });
-  }, [advertisements, filter, search]);
-
-  const loadAdvertisements = async () => {
-    setIsLoading(true);
-    try {
-      const payload = await api.get("/marketplace/advertisements");
-      setAdvertisements(normalizeSearchAdvertisements(payload));
-    } catch (nextError) {
-      setAdvertisements([]);
-      await showErrorAlert("Unable to load advertisements", {
-        text: nextError instanceof Error ? nextError.message : "Please refresh and try again.",
-        toast: true,
-        position: "top-end",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadAdvertisements();
-  }, []);
-
-  const resetForm = () => {
-    setEditingId(null);
-    setForm(defaultSearchAdvertisementForm);
-  };
-
-  const startEdit = (advertisement: SearchAdvertisement) => {
-    setEditingId(advertisement.id);
-    setForm({
-      title: advertisement.title,
-      description: advertisement.description,
-      imageUrl: advertisement.imageUrl,
-      ctaLabel: advertisement.ctaLabel || "Learn more",
-      ctaUrl: advertisement.ctaUrl,
-      locationLabel: advertisement.locationLabel,
-      sortOrder: advertisement.sortOrder,
-      status: advertisement.status,
-    });
-  };
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-
-    if (!form.title.trim() || !form.description.trim()) {
-      await showErrorAlert("Missing required fields", {
-        text: "Title and description are required.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        imageUrl: form.imageUrl.trim(),
-        ctaLabel: form.ctaLabel.trim() || "Learn more",
-        ctaUrl: form.ctaUrl.trim(),
-        locationLabel: form.locationLabel.trim(),
-        placement: "search-results" as const,
-        sortOrder: Number(form.sortOrder) || 0,
-        status: form.status,
-      };
-
-      if (editingId) {
-        await api.patch(`/marketplace/advertisements/${editingId}`, payload);
-      } else {
-        await api.post("/marketplace/advertisements", payload);
-      }
-
-      resetForm();
-      await loadAdvertisements();
-      await showSuccessAlert(editingId ? "Advertisement updated" : "Advertisement created", {
-        text: editingId
-          ? "The advertisement details were updated successfully."
-          : "The new advertisement is now ready for search-page placement.",
-      });
-    } catch (nextError) {
-      await showErrorAlert("Unable to save advertisement", {
-        text: nextError instanceof Error ? nextError.message : "Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (advertisement: SearchAdvertisement) => {
-    const confirmed = await showConfirmAlert({
-      title: "Delete advertisement?",
-      text: `This will permanently remove "${advertisement.title}" from search-page promotions.`,
-      confirmButtonText: "Delete",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#dc2626",
-      icon: "warning",
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await api.delete(`/marketplace/advertisements/${advertisement.id}`);
-      await loadAdvertisements();
-      await showSuccessAlert("Advertisement deleted", {
-        text: `"${advertisement.title}" was removed successfully.`,
-      });
-    } catch (nextError) {
-      await showErrorAlert("Unable to delete advertisement", {
-        text: nextError instanceof Error ? nextError.message : "Please try again.",
-      });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Advertisements"
-        description="Create and manage dynamic right-panel ads for the public search page."
-        actions={(
-          <Button variant="outline" className="rounded-xl" onClick={() => void loadAdvertisements()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        )}
-      />
-
-      <FilterChips
-        value={filter}
-        onChange={setFilter}
-        options={[
-          { label: "All", value: "all" },
-          { label: "Active", value: "active" },
-          { label: "Inactive", value: "inactive" },
-        ]}
-      />
-
-      <Card className="border border-gray-100 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{editingId ? "Edit advertisement" : "Create advertisement"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-6">
-              <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Ad title" className="rounded-xl border-gray-200 xl:col-span-2" />
-              <Input value={form.ctaLabel} onChange={(event) => setForm((current) => ({ ...current, ctaLabel: event.target.value }))} placeholder="CTA text (e.g. Book now)" className="rounded-xl border-gray-200" />
-              <Input value={form.ctaUrl} onChange={(event) => setForm((current) => ({ ...current, ctaUrl: event.target.value }))} placeholder="CTA link (https://...)" className="rounded-xl border-gray-200 xl:col-span-2" />
-              <Input type="number" min={0} value={form.sortOrder} onChange={(event) => setForm((current) => ({ ...current, sortOrder: Number(event.target.value) || 0 }))} placeholder="Order" className="rounded-xl border-gray-200" />
-            </div>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <Input value={form.imageUrl} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="Image URL (optional)" className="rounded-xl border-gray-200 xl:col-span-2" />
-              <div className="grid grid-cols-[minmax(0,1fr)_160px] gap-4">
-                <Input value={form.locationLabel} onChange={(event) => setForm((current) => ({ ...current, locationLabel: event.target.value }))} placeholder="Location chip (optional)" className="rounded-xl border-gray-200" />
-                <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as SearchAdvertisementStatus }))} className={FIELD_CLASS}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Short ad description shown in the search sidebar"
-              className={`${FIELD_CLASS} min-h-[110px] py-3`}
-            />
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {editingId ? (
-                <Button type="button" variant="outline" className="rounded-xl" onClick={resetForm}>
-                  Cancel
-                </Button>
-              ) : null}
-              <Button type="submit" className="rounded-xl bg-blue-600 text-white hover:bg-blue-700" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : editingId ? "Update Advertisement" : "Create Advertisement"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search advertisements by title, description, location, or CTA text"
-          className="rounded-xl border-gray-200 sm:max-w-xl"
-        />
-        <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600">
-          <Megaphone className="h-4 w-4 text-blue-600" />
-          {filteredAdvertisements.length} advertisement{filteredAdvertisements.length === 1 ? "" : "s"}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={`ad-loading-${index}`} className="h-52 animate-pulse rounded-2xl border border-gray-100 bg-white" />
-          ))}
-        </div>
-      ) : filteredAdvertisements.length === 0 ? (
-        <EmptyState title="No advertisements found" description="Create your first ad to populate the dynamic search sidebar placements." />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {filteredAdvertisements.map((advertisement) => (
-            <Card key={advertisement.id} className="overflow-hidden border border-gray-100 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-[190px_1fr]">
-                <div className="h-full min-h-[170px] bg-gray-100">
-                  {advertisement.imageUrl ? (
-                    <img src={advertisement.imageUrl} alt={advertisement.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 text-blue-600">
-                      <Megaphone className="h-8 w-8" />
-                    </div>
-                  )}
-                </div>
-                <CardContent className="space-y-3 pt-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-gray-900">{advertisement.title}</p>
-                      <p className="mt-1 text-xs text-gray-500">Order {advertisement.sortOrder} · Updated {formatDisplayDateTime(advertisement.updatedAt || advertisement.createdAt)}</p>
-                    </div>
-                    <ScopeBadge className={statusClass(advertisement.status)}>{advertisement.status}</ScopeBadge>
-                  </div>
-                  <p className="text-sm leading-6 text-gray-700">{advertisement.description}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1">Placement: Search Results</span>
-                    {advertisement.locationLabel ? (
-                      <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">{advertisement.locationLabel}</span>
-                    ) : null}
-                    {advertisement.ctaLabel ? (
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">
-                        CTA: {advertisement.ctaLabel}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => startEdit(advertisement)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-1 rounded-xl text-red-600" onClick={() => void handleDelete(advertisement)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 const defaultSubCategoryForm = {
   categoryId: "",
   name: "",
@@ -2228,8 +1766,6 @@ export function SuperAdminDashboard() {
         return <CategoriesPage />;
       case "browse-services":
         return <BrowseServicesPage />;
-      case "advertisements":
-        return <AdvertisementsPage />;
       case "sub-categories":
         return <SubCategoriesPage />;
       case "listings":
@@ -2244,9 +1780,9 @@ export function SuperAdminDashboard() {
   };
 
   return (
-    <div className="flex h-screen min-w-0 overflow-hidden bg-gray-50">
+    <div className="flex h-screen min-w-0 overflow-x-clip overflow-y-hidden bg-gray-50">
       <DashboardSidebar activeKey={activeKey} onNavigate={handleNavigate} />
-      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <main className="min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         {renderContent()}
       </main>
     </div>

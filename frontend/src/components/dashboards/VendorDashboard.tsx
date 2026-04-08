@@ -468,9 +468,9 @@ export function VendorDashboard({ onBack: _onBack }: VendorDashboardProps) {
   };
 
   return (
-    <div className="flex h-screen min-w-0 bg-gray-50 overflow-hidden">
+    <div className="flex h-screen min-w-0 overflow-x-clip overflow-y-hidden bg-gray-50">
       <DashboardSidebar activeKey={activeKey} onNavigate={handleNavigate} />
-      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <main className="min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         {renderContent()}
       </main>
     </div>
