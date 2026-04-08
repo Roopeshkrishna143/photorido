@@ -333,6 +333,7 @@ export function SettingsPage() {
     if (user?.role === "vendor") return "Vendor";
     return "User";
   }, [user?.role]);
+  const displayAvatar = avatarDraft?.previewUrl || profileForm.avatar;
 
   const profileReadiness = user?.profileComplete ? "Profile Ready" : "Needs Attention";
 
@@ -447,8 +448,8 @@ export function SettingsPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="w-full max-w-[280px] rounded-[28px] border border-white/80 bg-white/90 p-5 shadow-lg shadow-slate-200/60 backdrop-blur">
               <div className="mx-auto h-40 w-40 overflow-hidden rounded-full border-[6px] border-white bg-slate-100 shadow-xl">
-                {profileForm.avatar ? (
-                  <img src={profileForm.avatar} alt={profileForm.name || "Avatar"} className="h-full w-full object-cover" />
+                {displayAvatar ? (
+                  <img src={displayAvatar} alt={profileForm.name || "Avatar"} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500 text-4xl font-bold text-white">
                     {getInitials(profileForm.name || user?.name || "User")}

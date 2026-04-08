@@ -21,6 +21,18 @@ import {
   serializeBooking,
 } from "./marketplace.service.js";
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeDateOnlyValue(value: string, fieldLabel: string) {
+  const normalized = value.trim().slice(0, 10);
+
+  if (!DATE_ONLY_PATTERN.test(normalized)) {
+    throw new HttpError(400, `${fieldLabel} must use YYYY-MM-DD format.`);
+  }
+
+  return normalized;
+}
+
 const bookingCreateSchema = z.object({
   userName: z.string().trim().min(1, "User name is required."),
   userEmail: z.string().trim().email("A valid user email is required."),
@@ -29,7 +41,11 @@ const bookingCreateSchema = z.object({
   listingName: z.string().trim().min(1, "Listing name is required."),
   eventType: z.string().trim().min(1, "Event type is required."),
   location: z.string().trim().min(1, "Location is required."),
-  date: z.string().trim().min(1, "Booking date is required."),
+  date: z
+    .string()
+    .trim()
+    .min(1, "Booking date is required.")
+    .transform((value) => normalizeDateOnlyValue(value, "Booking date")),
   time: z.string().trim().min(1, "Booking time is required."),
   amount: z.string().trim().min(1, "Amount is required."),
   phoneNumber: z.string().trim().min(1, "Phone number is required."),
@@ -38,7 +54,12 @@ const bookingCreateSchema = z.object({
 const bookingUpdateSchema = z.object({
   eventType: z.string().trim().min(1).optional(),
   location: z.string().trim().min(1).optional(),
-  date: z.string().trim().min(1).optional(),
+  date: z
+    .string()
+    .trim()
+    .min(1)
+    .transform((value) => normalizeDateOnlyValue(value, "Booking date"))
+    .optional(),
   time: z.string().trim().min(1).optional(),
   amount: z.string().trim().min(1).optional(),
   phoneNumber: z.string().trim().min(1).optional(),
@@ -95,6 +116,7 @@ function applyBookingStatus(booking: MarketplaceBookingDocument, status: Booking
 
   if (status === "completed") {
     booking.paymentRequested = false;
+    booking.withdrawalRequested = false;
     booking.completedAt = new Date();
     return;
   }
@@ -499,8 +521,8 @@ marketplaceBookingRouter.post(
     if (authUser.role === "user" && booking.userId !== authUser.id) {
       throw new HttpError(403, "You can only update your own bookings.");
     }
-    if (booking.status !== "confirmed" && booking.status !== "completed") {
-      throw new HttpError(400, "Withdrawals are only available after the booking is confirmed.");
+    if (booking.status !== "confirmed") {
+      throw new HttpError(400, "Withdrawals are only available before a booking is completed.");
     }
 
     booking.withdrawalRequested = true;
@@ -523,7 +545,7 @@ marketplaceBookingRouter.post(
     if (authUser.role === "vendor" && booking.vendorId !== authUser.id) {
       throw new HttpError(403, "You can only confirm your own bookings.");
     }
-    if ((booking.status !== "confirmed" && booking.status !== "completed") || !booking.withdrawalRequested) {
+    if (booking.status !== "confirmed" || !booking.withdrawalRequested) {
       throw new HttpError(400, "Withdrawal confirmation is not available for this booking yet.");
     }
 

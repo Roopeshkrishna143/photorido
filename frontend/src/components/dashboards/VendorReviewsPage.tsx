@@ -1,17 +1,10 @@
 import { useMemo, useState } from "react";
 import { MessageSquareReply, Star } from "lucide-react";
 import { useMarketplace } from "../../context/MarketplaceContext";
+import { formatDisplayDate } from "../../lib/date";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Textarea } from "../ui/textarea";
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export function VendorReviewsPage() {
   const { reviews, respondToReview, isMutating } = useMarketplace();
@@ -81,7 +74,7 @@ export function VendorReviewsPage() {
                   <div>
                     <CardTitle className="text-base font-semibold text-gray-900">{review.userName}</CardTitle>
                     <p className="mt-1 text-sm text-gray-500">
-                      {review.listingName} • {formatDate(review.createdAt)}
+                      {review.listingName} • {formatDisplayDate(review.createdAt)}
                     </p>
                   </div>
                   <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600">
@@ -103,7 +96,7 @@ export function VendorReviewsPage() {
                     </div>
                     <p className="text-sm text-blue-900">{review.vendorResponse}</p>
                     {review.respondedAt && (
-                      <p className="mt-2 text-xs text-blue-600">Responded on {formatDate(review.respondedAt)}</p>
+                      <p className="mt-2 text-xs text-blue-600">Responded on {formatDisplayDate(review.respondedAt)}</p>
                     )}
                   </div>
                 ) : (

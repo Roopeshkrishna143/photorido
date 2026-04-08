@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { useFavorites } from "../../hooks/useFavorites";
 import { usePhotographers } from "../../hooks/usePhotographers";
 import {
   BookingStatus,
@@ -32,11 +33,26 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { formatDisplayDate } from "../../lib/date";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 const MSG_PAGE = 6;
 const BOOKING_PAGE = 6;
+const SEARCH_RESULT_FILTER_KEYS = [
+  "q",
+  "service",
+  "specialties",
+  "location",
+  "date",
+  "minRating",
+  "minPrice",
+  "maxPrice",
+  "sort",
+  "lat",
+  "lng",
+  "radiusKm",
+] as const;
 
 function getPhotographer(photographers: Array<{ id: string }>, photographerId: string) {
   return photographers.find((entry) => entry.id === photographerId);
@@ -534,8 +550,10 @@ function MessagesPanel({ role }: { role: "user" | "vendor" }) {
 export function MarketplaceConsumerOverview() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [dashboardSearchParams] = useSearchParams();
   const { bookings, conversations, openConversation } = useMarketplace();
   const { photographers } = usePhotographers();
+  const { favorites, isLoading: isFavoritesLoading, error: favoritesError } = useFavorites();
 
   const userBookings = useMemo(() => bookings, [bookings]);
   const userConversations = useMemo(() => conversations, [conversations]);
@@ -545,6 +563,14 @@ export function MarketplaceConsumerOverview() {
   const unreadMessages = userConversations.reduce((total, conversation) => total + conversation.userUnread, 0);
   const recentBookings = userBookings.slice(0, 3);
   const recentMessages = userConversations.slice(0, 3);
+  const searchListingParams = new URLSearchParams();
+
+  SEARCH_RESULT_FILTER_KEYS.forEach((key) => {
+    const value = dashboardSearchParams.get(key);
+    if (value) {
+      searchListingParams.set(key, value);
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -584,7 +610,7 @@ export function MarketplaceConsumerOverview() {
                         <p className="font-medium text-gray-900">{photographer?.name ?? booking.vendorName}</p>
                         <p className="text-xs text-gray-500">{booking.eventType} - {booking.listingName}</p>
                         <p className="text-xs text-gray-400 mt-1">
-                          {new Date(booking.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} - {booking.time}
+                          {formatDisplayDate(booking.date)} - {booking.time}
                         </p>
                       </div>
                     </div>
@@ -639,7 +665,20 @@ export function MarketplaceConsumerOverview() {
 
       <Card className="border border-gray-100 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Recommended Professionals</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base">Recommended Professionals</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={() => navigate({
+                pathname: "/search",
+                search: searchListingParams.toString() ? `?${searchListingParams.toString()}` : "",
+              })}
+            >
+              View All
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {photographers.slice(0, 3).map((photographer) => (
@@ -690,6 +729,54 @@ export function MarketplaceConsumerOverview() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border border-gray-100 shadow-sm">
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Saved Profiles</CardTitle>
+              <p className="text-xs text-gray-400">
+                Your bookmarked professionals stay synced here so you can jump back into their profiles quickly.
+              </p>
+            </div>
+            <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              {favorites.length} saved
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isFavoritesLoading ? (
+            <p className="text-sm text-gray-500">Loading saved profiles...</p>
+          ) : favoritesError ? (
+            <p className="text-sm text-red-600">{favoritesError}</p>
+          ) : favorites.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Profiles you save from the marketplace will appear here automatically.
+            </p>
+          ) : (
+            favorites.slice(0, 4).map((favorite) => (
+              <div key={favorite.favoriteId} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <img src={favorite.image} alt={favorite.name} className="h-12 w-12 rounded-xl object-cover" />
+                  <div>
+                    <p className="font-semibold text-gray-900">{favorite.name}</p>
+                    <p className="text-xs text-gray-500">{favorite.specialty}</p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Saved on {formatDisplayDate(favorite.savedAt)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-900">{favorite.price}</span>
+                  <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate(`/photographer/${favorite.photographerId}`)}>
+                    View Profile
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -715,6 +802,10 @@ export function MarketplaceConsumerBookings() {
   const start = (page - 1) * BOOKING_PAGE;
   const visible = userBookings.slice(start, start + BOOKING_PAGE);
   const reviewedBookingIds = new Set(reviews.map((review) => review.bookingId).filter(Boolean));
+  const userReviews = useMemo(
+    () => [...reviews].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [reviews],
+  );
 
   const pendingCount = userBookings.filter((booking) => booking.status === "pending").length;
   const vendorApprovedCount = userBookings.filter((booking) => booking.status === "approved_by_vendor").length;
@@ -794,7 +885,7 @@ export function MarketplaceConsumerBookings() {
                       </td>
                       <td className="py-4 px-4 text-gray-700 whitespace-nowrap">{booking.eventType}</td>
                       <td className="py-4 px-4 text-gray-600 whitespace-nowrap">
-                        {new Date(booking.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatDisplayDate(booking.date)}
                       </td>
                       <td className="py-4 px-4">
                         <BookingStatusBadge status={booking.status} />
@@ -852,7 +943,7 @@ export function MarketplaceConsumerBookings() {
                             </button>
                           )}
 
-                          {booking.status === "completed" && !booking.withdrawalRequested && (
+                          {booking.status === "completed" && (
                             <>
                               {!reviewedBookingIds.has(booking.id) ? (
                                 <button
@@ -866,32 +957,8 @@ export function MarketplaceConsumerBookings() {
                                   Review submitted
                                 </span>
                               )}
-
-                              <button
-                                onClick={() => requestWithdrawal(booking.id)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm"
-                              >
-                                <XCircle className="w-3.5 h-3.5" /> Withdraw Booking
-                              </button>
-                            </>
-                          )}
-
-                          {booking.status === "completed" && booking.withdrawalRequested && (
-                            <>
-                              {reviewedBookingIds.has(booking.id) ? (
-                                <span className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-                                  Review submitted
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => setReviewBookingId(booking.id)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors shadow-sm"
-                                >
-                                  <Star className="w-3.5 h-3.5" /> Leave Review
-                                </button>
-                              )}
-                              <span className="text-xs text-red-700 font-medium bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
-                                Withdrawal requested
+                              <span className="text-xs text-green-700 font-medium bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5">
+                                Booking completed
                               </span>
                             </>
                           )}
@@ -946,6 +1013,58 @@ export function MarketplaceConsumerBookings() {
           )}
         </Card>
       )}
+
+      <Card className="border border-gray-100 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Your Reviews & Replies</CardTitle>
+          <p className="text-xs text-gray-400">
+            Reviews from completed bookings appear here together with vendor replies whenever they respond.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {userReviews.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Submit a review after a completed booking and it will show up here.
+            </p>
+          ) : (
+            userReviews.map((review) => (
+              <div key={review.id} className="rounded-2xl border border-gray-100 bg-white px-4 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{review.vendorName}</p>
+                    <p className="mt-1 text-sm text-gray-500">{review.listingName}</p>
+                    <p className="mt-1 text-xs text-gray-400">Reviewed on {formatDisplayDate(review.createdAt)}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600">
+                    <Star className="h-4 w-4 fill-current" />
+                    {review.rating.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                  {review.comment}
+                </div>
+
+                {review.vendorResponse ? (
+                  <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Vendor Reply</p>
+                    <p className="mt-2 text-sm text-blue-900">{review.vendorResponse}</p>
+                    {review.respondedAt && (
+                      <p className="mt-2 text-xs text-blue-700">
+                        Replied on {formatDisplayDate(review.respondedAt)}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs font-medium text-gray-400">
+                    No vendor reply yet.
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {reviewBookingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
@@ -1008,7 +1127,7 @@ export function MarketplaceVendorBookings() {
   const pendingCount = vendorBookings.filter((booking) => booking.status === "pending").length;
   const paymentCount = vendorBookings.filter((booking) => booking.status === "approved_by_vendor" && booking.paymentRequested).length;
   const confirmedCount = vendorBookings.filter((booking) => booking.status === "confirmed").length;
-  const withdrawalCount = vendorBookings.filter((booking) => (booking.status === "confirmed" || booking.status === "completed") && booking.withdrawalRequested).length;
+  const withdrawalCount = vendorBookings.filter((booking) => booking.status === "confirmed" && booking.withdrawalRequested).length;
 
   return (
     <div className="space-y-5">
@@ -1052,7 +1171,7 @@ export function MarketplaceVendorBookings() {
                     </td>
                     <td className="py-4 px-4 text-gray-700">{booking.userName}</td>
                     <td className="py-4 px-4 text-gray-600 whitespace-nowrap">
-                      {new Date(booking.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      {formatDisplayDate(booking.date)}
                     </td>
                     <td className="py-4 px-4 text-gray-600 whitespace-nowrap">{booking.time}</td>
                     <td className="py-4 px-4">
@@ -1111,19 +1230,10 @@ export function MarketplaceVendorBookings() {
                           </button>
                         )}
 
-                        {booking.status === "completed" && !booking.withdrawalRequested && (
+                        {booking.status === "completed" && (
                           <span className="text-xs text-green-700 font-medium bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5">
                             Booking completed
                           </span>
-                        )}
-
-                        {booking.status === "completed" && booking.withdrawalRequested && (
-                          <button
-                            onClick={() => confirmWithdrawal(booking.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm"
-                          >
-                            <XCircle className="w-3.5 h-3.5" /> Confirm Withdrawal
-                          </button>
                         )}
 
                         {booking.status === "rejected_by_vendor" && (

@@ -275,7 +275,7 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
                   )}
 
                   {collapsed && (
-                    <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
                       {item.label}
                     </span>
                   )}
@@ -302,15 +302,15 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
               )}
             </div>
             {!collapsed && <span>Notifications</span>}
-            {collapsed && (
-              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                  {collapsed && (
+              <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
                 Notifications
               </span>
             )}
           </button>
 
           {showNotifications && (
-            <div className={`fixed inset-x-4 bottom-4 z-50 sm:absolute sm:inset-x-auto ${collapsed ? "sm:left-[84px]" : "sm:left-[268px]"} sm:bottom-24`}>
+            <div className={`fixed inset-x-4 bottom-4 z-50 sm:inset-x-auto ${collapsed ? "sm:left-[84px]" : "sm:left-[268px]"} sm:bottom-24`}>
               <MarketplaceNotificationCenter role={roleKey} onClose={() => setShowNotifications(false)} />
             </div>
           )}
@@ -324,7 +324,7 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
           <Settings className="h-[18px] w-[18px] flex-shrink-0 text-gray-400 group-hover:text-gray-600" />
           {!collapsed && <span>Settings</span>}
           {collapsed && (
-            <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
               Settings
             </span>
           )}
@@ -338,7 +338,7 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
           <LogOut className="h-[18px] w-[18px] flex-shrink-0" />
           {!collapsed && <span>Logout</span>}
           {collapsed && (
-            <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block">
               Logout
             </span>
           )}

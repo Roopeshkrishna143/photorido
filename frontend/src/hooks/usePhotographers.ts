@@ -23,6 +23,8 @@ export interface PhotographerReviewItem {
   reviewerName: string;
   rating: number;
   comment: string;
+  vendorResponse?: string | null;
+  respondedAt?: string | null;
   createdAt?: string;
 }
 
@@ -161,6 +163,8 @@ function normalizeReviewItems(value: unknown) {
         reviewerName: asString(entry.reviewerName, entry.userName, entry.clientName, entry.name) || "Client",
         rating: asNumber(entry.rating),
         comment: asString(entry.comment, entry.review, entry.text),
+        vendorResponse: asString(entry.vendorResponse, entry.reply, entry.response) || null,
+        respondedAt: asString(entry.respondedAt) || null,
         createdAt: asString(entry.createdAt, entry.date) || undefined,
       } satisfies PhotographerReviewItem;
     })

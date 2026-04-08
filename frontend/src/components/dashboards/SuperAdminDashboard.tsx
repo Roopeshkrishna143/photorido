@@ -36,6 +36,7 @@ import { SettingsPage } from "./SettingsPage";
 import { Input } from "../ui/input";
 import { api, unwrapPayload } from "../../lib/api";
 import { getServiceCategoryVisual } from "../../lib/public-marketplace";
+import { formatDisplayDate, formatDisplayDateTime } from "../../lib/date";
 import { showConfirmAlert, showErrorAlert, showSuccessAlert } from "../../lib/alerts";
 
 const FIELD_CLASS =
@@ -51,24 +52,6 @@ function formatCurrency(amount: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function bookingStatusLabel(status: BookingStatus) {
@@ -351,7 +334,7 @@ function DashboardPage() {
                   <div>
                     <p className="font-semibold text-gray-900">{activity.title}</p>
                     <p className="mt-1 text-sm text-gray-500">{activity.subtitle}</p>
-                    <p className="mt-1 text-xs text-gray-400">{formatDateTime(activity.createdAt)}</p>
+                    <p className="mt-1 text-xs text-gray-400">{formatDisplayDateTime(activity.createdAt)}</p>
                   </div>
                   <ScopeBadge className={
                     activity.type === "booking"
@@ -471,7 +454,7 @@ function DashboardPage() {
 }
 
 function BookingsPage() {
-  const { bookings, deleteBooking, updateBookingStatus, updateBooking } = useMarketplace();
+  const { bookings, deleteBooking, updateBooking } = useMarketplace();
   const [filter, setFilter] = useState<"all" | BookingStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -637,10 +620,10 @@ function BookingsPage() {
       ) : (
         <Card className="border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[1320px] w-full text-sm">
+            <table className="min-w-[1180px] w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {["User Info", "Vendor Info", "Booking", "Booking Date", "Amount", "Status", "Payment", "Withdrawal", "Last Updated", "Quick Status", "Actions"].map((heading) => (
+                  {["User Info", "Vendor Info", "Booking", "Booking Date", "Amount", "Status", "Payment", "Withdrawal", "Last Updated", "Actions"].map((heading) => (
                     <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                       {heading}
                     </th>
@@ -665,7 +648,7 @@ function BookingsPage() {
                       <p className="mt-1 text-xs text-gray-400">{booking.location}</p>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-gray-600">
-                      <p>{formatDate(booking.date)}</p>
+                      <p>{formatDisplayDate(booking.date)}</p>
                       <p className="mt-1 text-xs text-gray-500">{booking.time}</p>
                     </td>
                     <td className="px-4 py-4 font-semibold text-gray-900">{booking.amount}</td>
@@ -682,20 +665,7 @@ function BookingsPage() {
                         {booking.withdrawalRequested ? "Requested" : "None"}
                       </ScopeBadge>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">{formatDateTime(booking.updatedAt)}</td>
-                    <td className="px-4 py-4">
-                      <select
-                        value={booking.status}
-                        onChange={(event) => updateBookingStatus(booking.id, event.target.value as BookingStatus)}
-                        className={FIELD_CLASS}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="approved_by_vendor">Confirmed</option>
-                        <option value="rejected_by_vendor">Rejected</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">{formatDisplayDateTime(booking.updatedAt)}</td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => startEdit(booking)}>
@@ -853,7 +823,7 @@ function ReviewsPage() {
                     <div>
                       <p className="font-semibold text-gray-900">{review.vendorName}</p>
                       <p className="mt-1 text-sm text-gray-500">{review.listingName}</p>
-                      <p className="mt-1 text-xs text-gray-400">By {review.userName} on {formatDateTime(review.createdAt)}</p>
+                      <p className="mt-1 text-xs text-gray-400">By {review.userName} on {formatDisplayDateTime(review.createdAt)}</p>
                     </div>
                     <ScopeBadge className="bg-amber-100 text-amber-700 border-amber-200">
                       <Star className="mr-1 h-3.5 w-3.5 fill-current" />
@@ -1101,7 +1071,7 @@ function UserManagementPage() {
                   <td className="px-4 py-4"><ScopeBadge className={roleClass(user.role)}>{user.role}</ScopeBadge></td>
                   <td className="px-4 py-4"><ScopeBadge className={statusClass(user.status)}>{user.status}</ScopeBadge></td>
                   <td className="px-4 py-4 text-gray-600">{user.location || "-"}</td>
-                  <td className="px-4 py-4 text-xs text-gray-500">{formatDate(user.createdAt)}</td>
+                  <td className="px-4 py-4 text-xs text-gray-500">{formatDisplayDate(user.createdAt)}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => startEdit(user)}>
@@ -1501,7 +1471,7 @@ function CategoriesPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-gray-900">{category.name}</p>
-                  <p className="mt-1 text-xs text-gray-400">Created {formatDate(category.createdAt)}</p>
+                  <p className="mt-1 text-xs text-gray-400">Created {formatDisplayDate(category.createdAt)}</p>
                 </div>
                 <ScopeBadge className={statusClass(category.status)}>{category.status}</ScopeBadge>
               </div>
@@ -1617,7 +1587,7 @@ function BrowseServicesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-gray-900">{card.name}</p>
-                      <p className="mt-1 text-xs text-gray-400">Created {formatDate(card.createdAt)} - Order {card.sortOrder}</p>
+                      <p className="mt-1 text-xs text-gray-400">Created {formatDisplayDate(card.createdAt)} - Order {card.sortOrder}</p>
                     </div>
                     <ScopeBadge className={statusClass(card.status)}>{card.status}</ScopeBadge>
                   </div>
@@ -1727,7 +1697,7 @@ function SubCategoriesPage() {
                 <div>
                   <p className="font-semibold text-gray-900">{subCategory.name}</p>
                   <p className="mt-1 text-sm text-gray-500">{categoryLookup[subCategory.categoryId] ?? "Unknown category"}</p>
-                  <p className="mt-1 text-xs text-gray-400">Created {formatDate(subCategory.createdAt)}</p>
+                  <p className="mt-1 text-xs text-gray-400">Created {formatDisplayDate(subCategory.createdAt)}</p>
                 </div>
                 <ScopeBadge className={statusClass(subCategory.status)}>{subCategory.status}</ScopeBadge>
               </div>
@@ -1798,7 +1768,7 @@ function ListingsPage() {
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                     <span>{listing.price}</span>
                     <span>Ã¢â‚¬Â¢</span>
-                    <span>Submitted {formatDateTime(listing.createdAt)}</span>
+                    <span>Submitted {formatDisplayDateTime(listing.createdAt)}</span>
                   </div>
                   <div className="mt-5 flex items-center gap-2">
                     <Button

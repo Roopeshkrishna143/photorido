@@ -56,8 +56,12 @@
       outDir: 'build',
     },
     server: {
+      host: true, // comment this line to allow access from local network
       port: 3000,
       open: true,
+      allowedHosts: [
+    "jaylen-supervast-unmercurially.ngrok-free.dev"
+  ],
       proxy: {
         "/api": {
           target: "http://localhost:5000",

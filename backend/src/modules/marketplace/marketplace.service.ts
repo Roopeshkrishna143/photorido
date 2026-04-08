@@ -249,6 +249,8 @@ export function serializePhotographerReviewItem(review: MarketplaceReviewDocumen
     reviewerName: review.userName,
     rating: review.rating,
     comment: review.comment,
+    vendorResponse: review.vendorResponse ?? null,
+    respondedAt: review.respondedAt ? toIsoString(review.respondedAt) : null,
     createdAt: toIsoString(review.createdAt),
   };
 }

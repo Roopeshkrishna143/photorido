@@ -7,6 +7,7 @@ import { MobileNavBar } from "../MobileNavBar";
 import { useAuth } from "../../../context/AuthContext";
 import { useMarketplace } from "../../../context/MarketplaceContext";
 import { useFavorites } from "../../../hooks/useFavorites";
+import { formatDisplayDate } from "../../../lib/date";
 
 interface MobileDashboardProps {
   onNavigate: (page: MobilePage, data?: any) => void;
@@ -28,7 +29,7 @@ export function MobileDashboard({ onNavigate, onBack, photographers }: MobileDas
         .map((booking) => ({
           id: booking.id,
           photographer: photographers.find((photographer) => photographer.id === booking.photographerId),
-          date: new Date(booking.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
+          date: formatDisplayDate(booking.date, { day: "numeric", month: "long", year: "numeric" }),
           status: booking.status,
           type: booking.eventType,
         })),

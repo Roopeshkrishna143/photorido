@@ -4,6 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useMarketplace } from "../../../context/MarketplaceContext";
 import { BookingSlotType, usePhotographerDetail } from "../../../hooks/usePhotographers";
 import { showErrorAlert, showSuccessAlert } from "../../../lib/alerts";
+import { formatDateInputValue } from "../../../lib/date";
 
 interface MobileBookingProps {
   photographerId: string;
@@ -61,7 +62,7 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
     };
   };
 
-  const formatDate = (date: Date) => date.toISOString().split("T")[0];
+  const formatDate = (date: Date) => formatDateInputValue(date);
 
   const getDateStatus = (date: Date): DateStatus => {
     const dateStr = formatDate(date);

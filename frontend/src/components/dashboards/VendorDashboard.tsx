@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   Area,
   AreaChart,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useMarketplace } from "../../context/MarketplaceContext";
 import { useVendorAnalytics } from "../../hooks/useVendorData";
+import { useVendorSavedProfiles } from "../../hooks/useVendorSavedProfiles";
+import { formatDisplayDate } from "../../lib/date";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { DashboardSidebar } from "./DashboardSidebar";
@@ -63,8 +65,15 @@ function VendorMetricCard({
 }
 
 function VendorOverview() {
+  const navigate = useNavigate();
   const { bookings, conversations, listings, notifications, isLoading: isMarketplaceLoading } = useMarketplace();
   const { analytics, isLoading: isAnalyticsLoading, error: analyticsError } = useVendorAnalytics("all", "30d");
+  const {
+    profiles: savedProfiles,
+    totals: savedProfileTotals,
+    isLoading: isSavedProfilesLoading,
+    error: savedProfilesError,
+  } = useVendorSavedProfiles();
   const vendorBookings = useMemo(() => bookings, [bookings]);
   const vendorConversations = useMemo(() => conversations, [conversations]);
   const vendorListings = useMemo(() => listings, [listings]);
@@ -204,12 +213,69 @@ function VendorOverview() {
                   <p className="font-semibold text-gray-900">{booking.userName}</p>
                   <p className="text-sm text-gray-500">{booking.listingName}</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(booking.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} • {booking.time}
+                    {formatDisplayDate(booking.date)} • {booking.time}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-gray-900">{booking.amount}</p>
                   <p className="text-xs text-gray-500 mt-1">{booking.status.replaceAll("_", " ")}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-100 shadow-sm">
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-gray-900">Saved Profiles</CardTitle>
+              <p className="text-xs text-gray-400">
+                See which of your profiles users are saving so you can spot the strongest demand.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                {savedProfileTotals.saveCount} total saves
+              </span>
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={() => navigate("/dashboard?tab=listings")}>
+                Manage Profiles
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isSavedProfilesLoading ? (
+            <p className="text-sm text-gray-500">Loading saved-profile activity...</p>
+          ) : savedProfilesError ? (
+            <p className="text-sm text-red-600">{savedProfilesError}</p>
+          ) : savedProfiles.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Your saved-profile activity will appear here once users start bookmarking your approved listings.
+            </p>
+          ) : (
+            savedProfiles.slice(0, 5).map((profile) => (
+              <div key={profile.photographerId} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <img src={profile.image} alt={profile.listingName} className="h-12 w-12 rounded-xl object-cover" />
+                  <div>
+                    <p className="font-semibold text-gray-900">{profile.listingName}</p>
+                    <p className="text-xs text-gray-500">
+                      {[profile.city, profile.state].filter(Boolean).join(", ") || "Location unavailable"}
+                    </p>
+                    {profile.lastSavedAt && (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Last saved on {formatDisplayDate(profile.lastSavedAt)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-gray-900">{profile.saveCount}</p>
+                  <p className="text-xs text-gray-500">
+                    save{profile.saveCount === 1 ? "" : "s"}
+                  </p>
                 </div>
               </div>
             ))

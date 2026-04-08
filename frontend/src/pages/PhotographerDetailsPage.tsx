@@ -9,6 +9,7 @@ import { useMarketplace } from "../context/MarketplaceContext";
 import { useFavorites } from "../hooks/useFavorites";
 import { usePhotographerDetail } from "../hooks/usePhotographers";
 import { showErrorAlert, showSuccessAlert } from "../lib/alerts";
+import { formatDateInputValue, formatDisplayDate } from "../lib/date";
 import { shareProfessional } from "../lib/share";
 
 export function PhotographerDetailsPage() {
@@ -41,6 +42,8 @@ export function PhotographerDetailsPage() {
         reviewerName: review.userName,
         rating: review.rating,
         comment: review.comment,
+        vendorResponse: review.vendorResponse ?? null,
+        respondedAt: review.respondedAt ?? null,
         createdAt: review.createdAt,
       }));
   }, [marketplaceReviews, photographer]);
@@ -83,7 +86,7 @@ export function PhotographerDetailsPage() {
       listingName: photographer.services[0] ?? `${photographer.specialty} Package`,
       eventType: normalizedEventType,
       location: bookingData.location,
-      date: bookingData.date.toISOString().split("T")[0],
+      date: formatDateInputValue(bookingData.date),
       time: bookingTypeMap[bookingData.bookingType] ?? "Full Day",
       amount: photographer.price,
       phoneNumber: bookingData.phoneNumber || user.phoneNumber || "",
@@ -93,7 +96,7 @@ export function PhotographerDetailsPage() {
       throw new Error("We couldn't create your booking. Please try again.");
     }
 
-    const nextDate = bookingData.date.toISOString().split("T")[0];
+    const nextDate = formatDateInputValue(bookingData.date);
     setBlockedDates((current) => (
       current.some((entry) => entry.date === nextDate)
         ? current
@@ -293,6 +296,22 @@ export function PhotographerDetailsPage() {
                         </div>
                       </div>
                       <p className="text-gray-600 text-sm">{review.comment}</p>
+                      {review.vendorResponse && (
+                        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Vendor Reply</p>
+                          <p className="mt-2 text-sm text-blue-900">{review.vendorResponse}</p>
+                          {review.respondedAt && (
+                            <p className="mt-2 text-xs text-blue-700">
+                              Replied on {formatDisplayDate(review.respondedAt)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {review.createdAt && (
+                        <p className="mt-3 text-xs text-gray-400">
+                          Posted on {formatDisplayDate(review.createdAt)}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

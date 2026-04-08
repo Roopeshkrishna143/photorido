@@ -8,6 +8,16 @@ import { buildReviewStatsByPhotographerIds, serializePhotographerSummary } from 
 
 const favoriteRouter = Router();
 
+type VendorFavoriteSummaryItem = {
+  photographerId: string;
+  listingName: string;
+  image: string;
+  city: string;
+  state: string;
+  saveCount: number;
+  lastSavedAt: string;
+};
+
 function ensureAuthUser(request: AuthenticatedRequest) {
   if (!request.authUser) {
     throw new HttpError(401, "Authentication is required.");
@@ -47,6 +57,89 @@ favoriteRouter.get(
           };
         })
         .filter(Boolean),
+    });
+  }),
+);
+
+favoriteRouter.get(
+  "/favorites/vendor-summary",
+  requireAuth,
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = ensureAuthUser(request);
+    const profiles = await VendorProfileModel.find({ vendorId: authUser.id }).select("_id title featuredImage city state");
+
+    if (profiles.length === 0) {
+      response.status(200).json({
+        success: true,
+        data: {
+          profiles: [],
+          totals: {
+            saveCount: 0,
+            profileCount: 0,
+          },
+        },
+      });
+      return;
+    }
+
+    const profileIds = profiles.map((profile) => profile.id);
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+    const favoriteStats = await FavoriteModel.aggregate<{
+      _id: string;
+      saveCount: number;
+      lastSavedAt: Date;
+    }>([
+      {
+        $match: {
+          photographerId: { $in: profileIds },
+        },
+      },
+      {
+        $group: {
+          _id: "$photographerId",
+          saveCount: { $sum: 1 },
+          lastSavedAt: { $max: "$createdAt" },
+        },
+      },
+      {
+        $sort: {
+          saveCount: -1,
+          lastSavedAt: -1,
+        },
+      },
+    ]);
+
+    const savedProfiles = favoriteStats
+      .map((entry) => {
+        const profile = profileById.get(String(entry._id));
+        if (!profile) {
+          return null;
+        }
+
+        return {
+          photographerId: profile.id,
+          listingName: profile.title,
+          image: profile.featuredImage,
+          city: profile.city,
+          state: profile.state,
+          saveCount: entry.saveCount,
+          lastSavedAt: entry.lastSavedAt instanceof Date
+            ? entry.lastSavedAt.toISOString()
+            : new Date(entry.lastSavedAt).toISOString(),
+        };
+      })
+      .filter((profile): profile is VendorFavoriteSummaryItem => Boolean(profile));
+
+    response.status(200).json({
+      success: true,
+      data: {
+        profiles: savedProfiles,
+        totals: {
+          saveCount: savedProfiles.reduce((sum, profile) => sum + profile.saveCount, 0),
+          profileCount: savedProfiles.length,
+        },
+      },
     });
   }),
 );

@@ -7,6 +7,7 @@ import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ChevronLeft, ChevronRight, Clock, Loader2, MapPin, Phone, Users } from "lucide-react";
 import { showSuccessAlert } from "../lib/alerts";
+import { formatDateInputValue } from "../lib/date";
 
 interface BookingRequest {
   date: string;
@@ -61,7 +62,7 @@ export function BookingCalendar({
   };
 
   const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    return formatDateInputValue(date);
   };
 
   const getDateStatus = (date: Date) => {
