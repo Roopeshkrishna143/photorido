@@ -18,13 +18,44 @@ function normalizeSearchValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeLocationFilter(value: unknown) {
+  const normalized = normalizeSearchValue(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower === "current location" || lower === "near me" || lower === "my location") {
+    return "";
+  }
+
+  return normalized;
 }
 
 function parsePriceValue(value: string) {
-  const parsed = Number(String(value).replace(/[^\d.]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const matches = String(value).match(/\d[\d,]*(?:\.\d+)?/g);
+  if (!matches || matches.length === 0) {
+    return 0;
+  }
+
+  const values = matches
+    .map((entry) => Number(entry.replace(/,/g, "")))
+    .filter((entry) => Number.isFinite(entry) && entry > 0);
+
+  if (values.length === 0) {
+    return 0;
+  }
+
+  return Math.min(...values);
+}
+
+function parseNonNegativeNumber(value: unknown) {
+  const parsed = Number(normalizeSearchValue(value));
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, parsed);
 }
 
 function parseCoordinateValue(value: unknown) {
@@ -62,20 +93,26 @@ photographerRouter.get(
     const page = parsePagination(request.query.page, 1, 500);
     const limit = parsePagination(request.query.limit, 12, 100);
     const q = normalizeSearchValue(request.query.q);
-    const location = normalizeSearchValue(request.query.location);
+    const location = normalizeLocationFilter(request.query.location);
     const service = normalizeSearchValue(request.query.service);
     const specialties = normalizeSearchValue(request.query.specialties)
       .split(",")
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean);
-    const minRating = Number(normalizeSearchValue(request.query.minRating) || 0);
-    const minPrice = Number(normalizeSearchValue(request.query.minPrice) || 0);
-    const maxPrice = Number(normalizeSearchValue(request.query.maxPrice) || 0);
+    const minRating = parseNonNegativeNumber(request.query.minRating);
+    const requestedMinPrice = parseNonNegativeNumber(request.query.minPrice);
+    const requestedMaxPrice = parseNonNegativeNumber(request.query.maxPrice);
+    const minPrice = requestedMaxPrice > 0 && requestedMinPrice > requestedMaxPrice
+      ? requestedMaxPrice
+      : requestedMinPrice;
+    const maxPrice = requestedMaxPrice > 0 && requestedMinPrice > requestedMaxPrice
+      ? requestedMinPrice
+      : requestedMaxPrice;
     const sort = normalizeSearchValue(request.query.sort) || "latest";
     const date = normalizeSearchValue(request.query.date);
     const lat = parseCoordinateValue(request.query.lat);
     const lng = parseCoordinateValue(request.query.lng);
-    const radiusKm = Math.max(0, Number(normalizeSearchValue(request.query.radiusKm) || 0));
+    const radiusKm = parseNonNegativeNumber(request.query.radiusKm);
     const hasSearchCoordinates = lat !== null && lng !== null;
 
     const profiles = await VendorProfileModel.find({ status: "approved" }).sort({ updatedAt: -1, createdAt: -1 });
@@ -88,9 +125,6 @@ photographerRouter.get(
           }),
         )
       : new Set<string>();
-
-    const searchTerms = [q.toLowerCase(), location.toLowerCase(), service.toLowerCase()].filter(Boolean);
-    const pattern = searchTerms.length > 0 ? new RegExp(escapeRegex(searchTerms.join(" ")), "i") : null;
 
     let items = profiles
       .filter((profile) => !date || !blockedPhotographerIds.has(profile.id))
@@ -124,7 +158,7 @@ photographerRouter.get(
           .toLowerCase()
           .includes(entry));
 
-        return matchesQuery && matchesLocation && matchesService && matchesSpecialties && (!pattern || pattern.test(haystack));
+        return matchesQuery && matchesLocation && matchesService && matchesSpecialties;
       })
       .map((profile) => {
         const summary = serializePhotographerSummary(profile, statsByProfileId.get(profile.id));
