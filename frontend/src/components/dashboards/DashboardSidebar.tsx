@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Megaphone,
   MessageSquare,
   Settings,
   ShieldCheck,
@@ -53,6 +54,7 @@ const SUPER_ADMIN_NAV: NavCategory[] = [
     items: [
       { label: "Categories", icon: Tags, key: "categories" },
       { label: "Browse Services", icon: Sparkles, key: "browse-services" },
+      { label: "Advertisements", icon: Megaphone, key: "advertisements" },
       { label: "Sub-Categories", icon: Layers, key: "sub-categories" },
       { label: "User Management", icon: Users, key: "user-management" },
       { label: "User Profiles List", icon: ClipboardCheck, key: "listings" },
