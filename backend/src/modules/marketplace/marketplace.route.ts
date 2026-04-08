@@ -5,6 +5,7 @@ import { UserModel } from "../../models/user.model.js";
 import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
 import { SubCategoryModel } from "../../models/sub-category.model.js";
+import { SearchAdvertisementModel } from "../../models/search-advertisement.model.js";
 import { MarketplaceNotificationModel } from "../../models/notification.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
 import { asyncHandler } from "../../utils/async-handler.js";
@@ -23,6 +24,7 @@ import {
   serializeMarketplaceListing,
   serializeNotification,
   serializePlatformUser,
+  serializeSearchAdvertisement,
   serializeSubCategory,
   validateCategoryAndSubCategory,
 } from "./marketplace.service.js";
@@ -38,6 +40,22 @@ const browseServiceCardSchema = z.object({
   badgeText: z.string().trim().min(1, "Badge text is required."),
   sortOrder: z.coerce.number().int().min(0).default(0),
   status: z.enum(["active", "inactive"]).default("active"),
+});
+
+const searchAdvertisementSchema = z.object({
+  title: z.string().trim().min(1, "Title is required."),
+  subtitle: z.string().trim().default(""),
+  description: z.string().trim().min(1, "Description is required."),
+  badgeText: z.string().trim().default(""),
+  imageUrl: z.string().trim().min(1, "Image URL is required."),
+  ctaText: z.string().trim().min(1, "CTA text is required."),
+  ctaUrl: z.string().trim().min(1, "CTA URL is required."),
+  serviceTags: z.array(z.string().trim().min(1)).default([]),
+  locationTags: z.array(z.string().trim().min(1)).default([]),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  status: z.enum(["active", "inactive"]).default("active"),
+  startDate: z.string().trim().nullable().optional(),
+  endDate: z.string().trim().nullable().optional(),
 });
 
 const subCategorySchema = z.object({
@@ -93,6 +111,29 @@ const listingSchema = z.object({
 const locationResolveSchema = z.object({
   input: z.string().trim().min(1, "Location input is required."),
 });
+
+function normalizeTagList(tags: string[]) {
+  return Array.from(
+    new Set(
+      tags
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function parseNullableDate(raw: string | null | undefined, fieldName: string) {
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new HttpError(400, `${fieldName} must be a valid date.`);
+  }
+
+  return parsed;
+}
 
 const marketplaceRouter = Router();
 
@@ -355,6 +396,126 @@ marketplaceRouter.delete(
     response.status(200).json({
       success: true,
       message: "Browse by service card deleted successfully.",
+    });
+  }),
+);
+
+marketplaceRouter.get(
+  "/search-advertisements",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (_request, response) => {
+    const advertisements = await SearchAdvertisementModel.find().sort({
+      sortOrder: 1,
+      createdAt: -1,
+    });
+
+    response.status(200).json({
+      success: true,
+      data: advertisements.map((advertisement) => serializeSearchAdvertisement(advertisement)),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/search-advertisements",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = searchAdvertisementSchema.parse(request.body);
+    const startDate = parseNullableDate(input.startDate, "Start date");
+    const endDate = parseNullableDate(input.endDate, "End date");
+
+    if (startDate && endDate && startDate > endDate) {
+      throw new HttpError(400, "End date must be after start date.");
+    }
+
+    const advertisement = await SearchAdvertisementModel.create({
+      title: input.title,
+      subtitle: input.subtitle,
+      description: input.description,
+      badgeText: input.badgeText,
+      imageUrl: input.imageUrl,
+      ctaText: input.ctaText,
+      ctaUrl: input.ctaUrl,
+      serviceTags: normalizeTagList(input.serviceTags),
+      locationTags: normalizeTagList(input.locationTags),
+      sortOrder: input.sortOrder,
+      status: input.status,
+      startDate,
+      endDate,
+      createdByUserId: request.authUser.id,
+      updatedByUserId: request.authUser.id,
+    });
+
+    response.status(201).json({
+      success: true,
+      message: "Search advertisement created successfully.",
+      data: serializeSearchAdvertisement(advertisement),
+    });
+  }),
+);
+
+marketplaceRouter.patch(
+  "/search-advertisements/:advertisementId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    if (!request.authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = searchAdvertisementSchema.parse(request.body);
+    const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
+    if (!advertisement) {
+      throw new HttpError(404, "Search advertisement not found.");
+    }
+
+    const startDate = parseNullableDate(input.startDate, "Start date");
+    const endDate = parseNullableDate(input.endDate, "End date");
+    if (startDate && endDate && startDate > endDate) {
+      throw new HttpError(400, "End date must be after start date.");
+    }
+
+    advertisement.title = input.title;
+    advertisement.subtitle = input.subtitle;
+    advertisement.description = input.description;
+    advertisement.badgeText = input.badgeText;
+    advertisement.imageUrl = input.imageUrl;
+    advertisement.ctaText = input.ctaText;
+    advertisement.ctaUrl = input.ctaUrl;
+    advertisement.serviceTags = normalizeTagList(input.serviceTags);
+    advertisement.locationTags = normalizeTagList(input.locationTags);
+    advertisement.sortOrder = input.sortOrder;
+    advertisement.status = input.status;
+    advertisement.startDate = startDate;
+    advertisement.endDate = endDate;
+    advertisement.updatedByUserId = request.authUser.id;
+    await advertisement.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Search advertisement updated successfully.",
+      data: serializeSearchAdvertisement(advertisement),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/search-advertisements/:advertisementId",
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
+    if (!advertisement) {
+      throw new HttpError(404, "Search advertisement not found.");
+    }
+
+    await advertisement.deleteOne();
+
+    response.status(200).json({
+      success: true,
+      message: "Search advertisement deleted successfully.",
     });
   }),
 );

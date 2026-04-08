@@ -126,18 +126,18 @@ export function HomePage() {
     useCurrentLocation?: boolean;
   }) => {
     const nextSearch = new URLSearchParams();
+    const shouldUseCurrentLocation = Boolean(
+      params.useCurrentLocation && typeof params.lat === "number" && typeof params.lng === "number",
+    );
 
     if (params.service) nextSearch.set("service", params.service);
-    if (params.location) nextSearch.set("location", params.location);
+    if (!shouldUseCurrentLocation && params.location) nextSearch.set("location", params.location);
     if (params.date) nextSearch.set("date", params.date);
-    if (params.useCurrentLocation && typeof params.lat === "number" && typeof params.lng === "number") {
+    if (shouldUseCurrentLocation) {
       nextSearch.set("lat", String(params.lat));
       nextSearch.set("lng", String(params.lng));
       nextSearch.set("radiusKm", String(params.radiusKm ?? CURRENT_LOCATION_RADIUS_KM));
       nextSearch.set("sort", "distance-asc");
-      if (!params.location) {
-        nextSearch.set("location", "Current location");
-      }
     }
 
     navigate(nextSearch.toString() ? `/search?${nextSearch.toString()}` : "/search");

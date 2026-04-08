@@ -22,6 +22,9 @@ import {
   MarketplaceRoleDefinitionModel,
   type MarketplaceRoleDefinitionDocument,
 } from "../../models/role-definition.model.js";
+import {
+  type SearchAdvertisementDocument,
+} from "../../models/search-advertisement.model.js";
 import { SubCategoryModel, type SubCategoryDocument } from "../../models/sub-category.model.js";
 import { UserModel, type UserDocument, type UserRole } from "../../models/user.model.js";
 import { VendorProfileModel, type VendorProfileDocument } from "../../models/vendor-profile.model.js";
@@ -88,6 +91,27 @@ export function serializeBrowseServiceCard(card: BrowseServiceCardDocument) {
     sortOrder: card.sortOrder,
     status: card.status,
     createdAt: toIsoString(card.createdAt),
+  };
+}
+
+export function serializeSearchAdvertisement(advertisement: SearchAdvertisementDocument) {
+  return {
+    id: advertisement.id,
+    title: advertisement.title,
+    subtitle: advertisement.subtitle,
+    description: advertisement.description,
+    badgeText: advertisement.badgeText,
+    imageUrl: advertisement.imageUrl,
+    ctaText: advertisement.ctaText,
+    ctaUrl: advertisement.ctaUrl,
+    serviceTags: advertisement.serviceTags,
+    locationTags: advertisement.locationTags,
+    sortOrder: advertisement.sortOrder,
+    status: advertisement.status,
+    startDate: advertisement.startDate ? toIsoString(advertisement.startDate) : null,
+    endDate: advertisement.endDate ? toIsoString(advertisement.endDate) : null,
+    createdAt: toIsoString(advertisement.createdAt),
+    updatedAt: toIsoString(advertisement.updatedAt),
   };
 }
 

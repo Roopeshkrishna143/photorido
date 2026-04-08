@@ -143,6 +143,25 @@ export interface MarketplaceBrowseServiceCard {
   createdAt: string;
 }
 
+export interface MarketplaceSearchAdvertisement {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  badgeText: string;
+  imageUrl: string;
+  ctaText: string;
+  ctaUrl: string;
+  serviceTags: string[];
+  locationTags: string[];
+  sortOrder: number;
+  status: "active" | "inactive";
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MarketplaceSubCategory {
   id: string;
   categoryId: string;
@@ -309,6 +328,22 @@ interface CreateBrowseServiceCardInput {
   status: MarketplaceBrowseServiceCard["status"];
 }
 
+interface CreateSearchAdvertisementInput {
+  title: string;
+  subtitle: string;
+  description: string;
+  badgeText: string;
+  imageUrl: string;
+  ctaText: string;
+  ctaUrl: string;
+  serviceTags: string[];
+  locationTags: string[];
+  sortOrder: number;
+  status: MarketplaceSearchAdvertisement["status"];
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
 interface CreateSubCategoryInput {
   categoryId: string;
   name: string;
@@ -325,6 +360,7 @@ interface MarketplaceSnapshot {
   roles: MarketplaceRoleDefinition[];
   categories: MarketplaceCategory[];
   browseServiceCards: MarketplaceBrowseServiceCard[];
+  searchAdvertisements: MarketplaceSearchAdvertisement[];
   subCategories: MarketplaceSubCategory[];
   listings: MarketplaceListing[];
 }
@@ -375,6 +411,9 @@ interface MarketplaceContextValue extends MarketplaceSnapshot {
   addBrowseServiceCard: (input: CreateBrowseServiceCardInput) => MarketplaceMutationResult;
   updateBrowseServiceCard: (browseServiceCardId: string, input: CreateBrowseServiceCardInput) => MarketplaceMutationResult;
   deleteBrowseServiceCard: (browseServiceCardId: string) => MarketplaceMutationResult;
+  addSearchAdvertisement: (input: CreateSearchAdvertisementInput) => MarketplaceMutationResult;
+  updateSearchAdvertisement: (advertisementId: string, input: CreateSearchAdvertisementInput) => MarketplaceMutationResult;
+  deleteSearchAdvertisement: (advertisementId: string) => MarketplaceMutationResult;
   addSubCategory: (input: CreateSubCategoryInput) => MarketplaceMutationResult;
   updateSubCategory: (subCategoryId: string, input: CreateSubCategoryInput) => MarketplaceMutationResult;
   deleteSubCategory: (subCategoryId: string) => MarketplaceMutationResult;
@@ -390,6 +429,7 @@ const EMPTY_SNAPSHOT: MarketplaceSnapshot = {
   roles: [],
   categories: [],
   browseServiceCards: [],
+  searchAdvertisements: [],
   subCategories: [],
   listings: [],
 };
@@ -404,6 +444,7 @@ const RESOURCE_ENDPOINTS = {
   roles: "/marketplace/roles",
   categories: "/marketplace/categories",
   browseServiceCards: "/marketplace/browse-services",
+  searchAdvertisements: "/marketplace/search-advertisements",
   subCategories: "/marketplace/sub-categories",
   listings: "/marketplace/listings",
 } satisfies Record<keyof MarketplaceSnapshot, string>;
@@ -421,6 +462,7 @@ const ROLE_RESOURCE_MAP: Record<ManagedUserRole, (keyof MarketplaceSnapshot)[]> 
     "roles",
     "categories",
     "browseServiceCards",
+    "searchAdvertisements",
     "subCategories",
     "listings",
   ],
@@ -701,6 +743,12 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
         runMutation(() => api.patch(`${RESOURCE_ENDPOINTS.browseServiceCards}/${browseServiceCardId}`, input)),
       deleteBrowseServiceCard: (browseServiceCardId) =>
         runMutation(() => api.delete(`${RESOURCE_ENDPOINTS.browseServiceCards}/${browseServiceCardId}`)),
+      addSearchAdvertisement: (input) =>
+        runMutation(() => api.post(RESOURCE_ENDPOINTS.searchAdvertisements, input)),
+      updateSearchAdvertisement: (advertisementId, input) =>
+        runMutation(() => api.patch(`${RESOURCE_ENDPOINTS.searchAdvertisements}/${advertisementId}`, input)),
+      deleteSearchAdvertisement: (advertisementId) =>
+        runMutation(() => api.delete(`${RESOURCE_ENDPOINTS.searchAdvertisements}/${advertisementId}`)),
       addSubCategory: (input) =>
         runMutation(() => api.post(RESOURCE_ENDPOINTS.subCategories, input)),
       updateSubCategory: (subCategoryId, input) =>

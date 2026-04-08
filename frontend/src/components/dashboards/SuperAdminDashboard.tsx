@@ -7,6 +7,7 @@ import {
   ManagedUserRole,
   MarketplaceBrowseServiceCard,
   MarketplaceCategory,
+  MarketplaceSearchAdvertisement,
   MarketplaceReview,
   MarketplacePermission,
   MarketplacePlatformUser,
@@ -19,6 +20,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   LayoutDashboard,
+  Megaphone,
   Pencil,
   Plus,
   Sparkles,
@@ -52,6 +54,30 @@ function formatCurrency(amount: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function splitCsv(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function joinCsv(values: string[]) {
+  return values.join(", ");
+}
+
+function toIsoDateString(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 function bookingStatusLabel(status: BookingStatus) {
@@ -1551,6 +1577,293 @@ function BrowseServicesPage() {
   );
 }
 
+const defaultSearchAdvertisementForm = {
+  title: "",
+  subtitle: "",
+  description: "",
+  badgeText: "",
+  imageUrl: "",
+  ctaText: "View Details",
+  ctaUrl: "/search",
+  serviceTags: "",
+  locationTags: "",
+  sortOrder: 0,
+  status: "active" as MarketplaceSearchAdvertisement["status"],
+  startDate: "",
+  endDate: "",
+};
+
+function SearchAdvertisementsPage() {
+  const {
+    searchAdvertisements,
+    addSearchAdvertisement,
+    updateSearchAdvertisement,
+    deleteSearchAdvertisement,
+  } = useMarketplace();
+  const [filter, setFilter] = useState<"all" | MarketplaceSearchAdvertisement["status"]>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(defaultSearchAdvertisementForm);
+
+  const filteredAdvertisements = (filter === "all"
+    ? searchAdvertisements
+    : searchAdvertisements.filter((advertisement) => advertisement.status === filter))
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.title.localeCompare(right.title));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    const payload = {
+      title: form.title.trim(),
+      subtitle: form.subtitle.trim(),
+      description: form.description.trim(),
+      badgeText: form.badgeText.trim(),
+      imageUrl: form.imageUrl.trim(),
+      ctaText: form.ctaText.trim(),
+      ctaUrl: form.ctaUrl.trim(),
+      serviceTags: splitCsv(form.serviceTags),
+      locationTags: splitCsv(form.locationTags),
+      sortOrder: Number(form.sortOrder) || 0,
+      status: form.status,
+      startDate: toIsoDateString(form.startDate),
+      endDate: toIsoDateString(form.endDate),
+    };
+
+    const succeeded = editingId
+      ? await updateSearchAdvertisement(editingId, payload)
+      : await addSearchAdvertisement(payload);
+
+    if (!succeeded) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm(defaultSearchAdvertisementForm);
+  };
+
+  const startEditing = (advertisement: MarketplaceSearchAdvertisement) => {
+    setEditingId(advertisement.id);
+    setForm({
+      title: advertisement.title,
+      subtitle: advertisement.subtitle,
+      description: advertisement.description,
+      badgeText: advertisement.badgeText,
+      imageUrl: advertisement.imageUrl,
+      ctaText: advertisement.ctaText,
+      ctaUrl: advertisement.ctaUrl,
+      serviceTags: joinCsv(advertisement.serviceTags),
+      locationTags: joinCsv(advertisement.locationTags),
+      sortOrder: advertisement.sortOrder,
+      status: advertisement.status,
+      startDate: advertisement.startDate ? advertisement.startDate.slice(0, 10) : "",
+      endDate: advertisement.endDate ? advertisement.endDate.slice(0, 10) : "",
+    });
+  };
+
+  const removeAdvertisement = async (advertisement: MarketplaceSearchAdvertisement) => {
+    const confirmed = await showConfirmAlert({
+      title: "Delete this advertisement?",
+      text: `${advertisement.title} will be removed from search placements.`,
+      icon: "warning",
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteSearchAdvertisement(advertisement.id);
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Search Advertisements"
+        description="Manage sponsored placements shown on the right side of the search results page."
+      />
+      <FilterChips
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { label: "All", value: "all" },
+          { label: "Active", value: "active" },
+          { label: "Inactive", value: "inactive" },
+        ]}
+      />
+
+      <Card className="border border-gray-100 shadow-sm">
+        <CardContent className="pt-6">
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+              <Input
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Advertisement title"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                value={form.subtitle}
+                onChange={(event) => setForm((current) => ({ ...current, subtitle: event.target.value }))}
+                placeholder="Subtitle"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                value={form.badgeText}
+                onChange={(event) => setForm((current) => ({ ...current, badgeText: event.target.value }))}
+                placeholder="Badge text (Sponsored)"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                type="number"
+                min={0}
+                value={form.sortOrder}
+                onChange={(event) => setForm((current) => ({ ...current, sortOrder: Number(event.target.value) || 0 }))}
+                placeholder="Sort order"
+                className="rounded-xl border-gray-200"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <Input
+                value={form.imageUrl}
+                onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))}
+                placeholder="Image URL"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                value={form.ctaText}
+                onChange={(event) => setForm((current) => ({ ...current, ctaText: event.target.value }))}
+                placeholder="CTA text"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                value={form.ctaUrl}
+                onChange={(event) => setForm((current) => ({ ...current, ctaUrl: event.target.value }))}
+                placeholder="CTA URL (https:// or /path)"
+                className="rounded-xl border-gray-200"
+              />
+            </div>
+
+            <textarea
+              value={form.description}
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              placeholder="Ad copy shown in the card"
+              className={`${FIELD_CLASS} min-h-[96px] py-3`}
+            />
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+              <Input
+                value={form.serviceTags}
+                onChange={(event) => setForm((current) => ({ ...current, serviceTags: event.target.value }))}
+                placeholder="Service tags (wedding, portrait)"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                value={form.locationTags}
+                onChange={(event) => setForm((current) => ({ ...current, locationTags: event.target.value }))}
+                placeholder="Location tags (hyderabad, madhapur)"
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                type="date"
+                value={form.startDate}
+                onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
+                className="rounded-xl border-gray-200"
+              />
+              <Input
+                type="date"
+                value={form.endDate}
+                onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
+                className="rounded-xl border-gray-200"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto_auto]">
+              <select
+                value={form.status}
+                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as MarketplaceSearchAdvertisement["status"] }))}
+                className={FIELD_CLASS}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+                {editingId ? "Update Advertisement" : "Create Advertisement"}
+              </Button>
+              {editingId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingId(null);
+                    setForm(defaultSearchAdvertisementForm);
+                  }}
+                >
+                  Cancel Edit
+                </Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {filteredAdvertisements.length === 0 ? (
+        <EmptyState title="No advertisements yet" description="Create the first sponsored placement for search results." />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredAdvertisements.map((advertisement) => (
+            <Card key={advertisement.id} className="overflow-hidden border border-gray-100 shadow-sm">
+              <div className="relative h-40 overflow-hidden bg-slate-100">
+                <img
+                  src={advertisement.imageUrl}
+                  alt={advertisement.title}
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                  <Megaphone className="h-3.5 w-3.5" />
+                  {advertisement.badgeText || "Sponsored"}
+                </div>
+              </div>
+              <CardContent className="space-y-4 pt-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">{advertisement.title}</p>
+                    <p className="mt-1 text-xs text-gray-500">{advertisement.subtitle}</p>
+                  </div>
+                  <ScopeBadge className={statusClass(advertisement.status)}>{advertisement.status}</ScopeBadge>
+                </div>
+                <p className="text-sm text-gray-600">{advertisement.description}</p>
+                <div className="space-y-2 text-xs text-gray-500">
+                  <p>CTA: {advertisement.ctaText} - {advertisement.ctaUrl}</p>
+                  <p>Order: {advertisement.sortOrder}</p>
+                  <p>
+                    Active Window: {advertisement.startDate ? formatDisplayDate(advertisement.startDate) : "Immediate"} to {advertisement.endDate ? formatDisplayDate(advertisement.endDate) : "No expiry"}
+                  </p>
+                  {advertisement.serviceTags.length > 0 && <p>Service Tags: {advertisement.serviceTags.join(", ")}</p>}
+                  {advertisement.locationTags.length > 0 && <p>Location Tags: {advertisement.locationTags.join(", ")}</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="gap-1 rounded-xl text-blue-600" onClick={() => startEditing(advertisement)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1 rounded-xl text-red-600" onClick={() => void removeAdvertisement(advertisement)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const defaultSubCategoryForm = {
   categoryId: "",
   name: "",
@@ -1766,6 +2079,8 @@ export function SuperAdminDashboard() {
         return <CategoriesPage />;
       case "browse-services":
         return <BrowseServicesPage />;
+      case "advertisements":
+        return <SearchAdvertisementsPage />;
       case "sub-categories":
         return <SubCategoriesPage />;
       case "listings":

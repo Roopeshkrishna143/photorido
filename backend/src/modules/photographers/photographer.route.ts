@@ -18,12 +18,13 @@ function normalizeSearchValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+function parsePriceValue(value: unknown) {
+  const numericChunks = String(value).match(/[\d,.]+/g);
+  if (!numericChunks || numericChunks.length === 0) {
+    return 0;
+  }
 
-function parsePriceValue(value: string) {
-  const parsed = Number(String(value).replace(/[^\d.]/g, ""));
+  const parsed = Number(numericChunks[0]?.replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -56,6 +57,12 @@ function calculateDistanceKm(
   return Number((earthRadiusKm * centralAngle).toFixed(1));
 }
 
+function hasValidCoordinates(coordinates: { lat: number; lng: number }) {
+  return Number.isFinite(coordinates.lat)
+    && Number.isFinite(coordinates.lng)
+    && (coordinates.lat !== 0 || coordinates.lng !== 0);
+}
+
 photographerRouter.get(
   "/",
   asyncHandler(async (request, response) => {
@@ -69,14 +76,15 @@ photographerRouter.get(
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean);
     const minRating = Number(normalizeSearchValue(request.query.minRating) || 0);
-    const minPrice = Number(normalizeSearchValue(request.query.minPrice) || 0);
-    const maxPrice = Number(normalizeSearchValue(request.query.maxPrice) || 0);
+    const minPrice = parsePriceValue(request.query.minPrice);
+    const maxPrice = parsePriceValue(request.query.maxPrice);
     const sort = normalizeSearchValue(request.query.sort) || "latest";
     const date = normalizeSearchValue(request.query.date);
     const lat = parseCoordinateValue(request.query.lat);
     const lng = parseCoordinateValue(request.query.lng);
     const radiusKm = Math.max(0, Number(normalizeSearchValue(request.query.radiusKm) || 0));
     const hasSearchCoordinates = lat !== null && lng !== null;
+    const searchCoordinates = hasSearchCoordinates ? { lat, lng } : null;
 
     const profiles = await VendorProfileModel.find({ status: "approved" }).sort({ updatedAt: -1, createdAt: -1 });
     const statsByProfileId = await buildReviewStatsByPhotographerIds(profiles.map((profile) => profile.id));
@@ -89,9 +97,6 @@ photographerRouter.get(
         )
       : new Set<string>();
 
-    const searchTerms = [q.toLowerCase(), location.toLowerCase(), service.toLowerCase()].filter(Boolean);
-    const pattern = searchTerms.length > 0 ? new RegExp(escapeRegex(searchTerms.join(" ")), "i") : null;
-
     let items = profiles
       .filter((profile) => !date || !blockedPhotographerIds.has(profile.id))
       .filter((profile) => {
@@ -103,12 +108,14 @@ photographerRouter.get(
           profile.city,
           profile.state,
           profile.area,
+          profile.colony,
           profile.district,
+          profile.pincode,
           profile.description,
         ].filter(Boolean).join(" ");
 
         const matchesQuery = !q || haystack.toLowerCase().includes(q.toLowerCase());
-        const matchesLocation = !location || [profile.city, profile.state, profile.area, profile.district, profile.address]
+        const matchesLocation = !location || [profile.city, profile.state, profile.area, profile.colony, profile.district, profile.address, profile.pincode]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -124,12 +131,12 @@ photographerRouter.get(
           .toLowerCase()
           .includes(entry));
 
-        return matchesQuery && matchesLocation && matchesService && matchesSpecialties && (!pattern || pattern.test(haystack));
+        return matchesQuery && matchesLocation && matchesService && matchesSpecialties;
       })
       .map((profile) => {
         const summary = serializePhotographerSummary(profile, statsByProfileId.get(profile.id));
-        const distanceKm = hasSearchCoordinates
-          ? calculateDistanceKm({ lat, lng }, summary.coordinates)
+        const distanceKm = searchCoordinates && hasValidCoordinates(summary.coordinates)
+          ? calculateDistanceKm(searchCoordinates, summary.coordinates)
           : undefined;
 
         return {

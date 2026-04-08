@@ -12,6 +12,7 @@ import { MarketplaceNotificationModel } from "../models/notification.model.js";
 import { MarketplacePermissionModel } from "../models/permission.model.js";
 import { MarketplaceReviewModel } from "../models/review.model.js";
 import { MarketplaceRoleDefinitionModel } from "../models/role-definition.model.js";
+import { SearchAdvertisementModel } from "../models/search-advertisement.model.js";
 import { NewsletterSubscriptionModel } from "../models/newsletter-subscription.model.js";
 import { RefreshTokenModel } from "../models/refresh-token.model.js";
 import { SubCategoryModel } from "../models/sub-category.model.js";
@@ -35,6 +36,7 @@ const EXPORT_SYNC_TARGETS: ExportSyncTarget[] = [
   { fileName: "photorido.marketplaceroledefinitions.json", model: MarketplaceRoleDefinitionModel },
   { fileName: "photorido.categories.json", model: CategoryModel },
   { fileName: "photorido.browseservicecards.json", model: BrowseServiceCardModel },
+  { fileName: "photorido.searchadvertisements.json", model: SearchAdvertisementModel },
   { fileName: "photorido.subcategories.json", model: SubCategoryModel },
   { fileName: "photorido.vendorprofiles.json", model: VendorProfileModel },
   { fileName: "photorido.marketplacebookings.json", model: MarketplaceBookingModel },
