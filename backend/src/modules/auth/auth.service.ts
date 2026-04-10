@@ -68,6 +68,127 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isEmailVerified(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value.toLowerCase() === "true";
+  }
+
+  return false;
+}
+
+interface GoogleTokenInfoResponse {
+  aud?: string;
+  expires_in?: string;
+  scope?: string;
+  sub?: string;
+}
+
+interface GoogleUserInfoResponse {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean | string;
+  name?: string;
+  given_name?: string;
+  picture?: string;
+}
+
+function resolveGoogleUserName(profile: GoogleUserInfoResponse) {
+  const rawName = profile.name?.trim() || profile.given_name?.trim();
+  if (rawName) {
+    return rawName.slice(0, 80);
+  }
+
+  if (profile.email) {
+    return profile.email.split("@")[0]?.trim().slice(0, 80) || "Google User";
+  }
+
+  return "Google User";
+}
+
+async function verifyGoogleAccessToken(accessToken: string) {
+  if (!env.GOOGLE_CLIENT_ID) {
+    throw new HttpError(503, "Google login is not configured.");
+  }
+
+  let tokenInfo: GoogleTokenInfoResponse;
+  try {
+    const tokenInfoUrl = new URL("https://oauth2.googleapis.com/tokeninfo");
+    tokenInfoUrl.searchParams.set("access_token", accessToken);
+
+    const response = await fetch(tokenInfoUrl, { method: "GET" });
+    if (!response.ok) {
+      throw new HttpError(401, "Google access token is invalid or expired.");
+    }
+
+    tokenInfo = await response.json() as GoogleTokenInfoResponse;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+
+    throw new HttpError(502, "Google token verification failed. Please try again.");
+  }
+
+  if (tokenInfo.aud !== env.GOOGLE_CLIENT_ID) {
+    throw new HttpError(401, "Google access token audience mismatch.");
+  }
+
+  if (tokenInfo.expires_in && Number(tokenInfo.expires_in) <= 0) {
+    throw new HttpError(401, "Google access token has expired.");
+  }
+
+  return tokenInfo;
+}
+
+async function fetchGoogleUserInfo(accessToken: string) {
+  let profile: GoogleUserInfoResponse;
+  try {
+    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new HttpError(401, "Unable to fetch profile details from Google.");
+    }
+
+    profile = await response.json() as GoogleUserInfoResponse;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+
+    throw new HttpError(502, "Google profile lookup failed. Please try again.");
+  }
+
+  const normalizedEmail = profile.email?.trim().toLowerCase();
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    throw new HttpError(400, "Google account does not have a valid email address.");
+  }
+
+  if (!isEmailVerified(profile.email_verified)) {
+    throw new HttpError(403, "Google email is not verified.");
+  }
+
+  const googleId = profile.sub?.trim();
+  if (!googleId) {
+    throw new HttpError(400, "Google account id is missing.");
+  }
+
+  return {
+    googleId,
+    email: normalizedEmail,
+    name: resolveGoogleUserName(profile),
+    avatar: profile.picture?.trim() || undefined,
+  };
+}
+
 function normalizePhoneNumber(value: string) {
   const compact = value.replace(/[\s\-()]/g, "");
   const normalized = compact.startsWith("+") ? `+${compact.slice(1).replace(/\D/g, "")}` : compact.replace(/\D/g, "");
@@ -385,6 +506,89 @@ export async function verifyRegistrationOtpAndCreateUser(
   });
 
   await otpRequest.deleteOne();
+  return createSession(user, request);
+}
+
+export async function signInWithGoogle(
+  input: {
+    accessToken: string;
+    role?: "vendor" | "user" | null;
+  },
+  request?: Pick<Request, "ip" | "headers">,
+) {
+  const accessToken = input.accessToken.trim();
+  if (!accessToken) {
+    throw new HttpError(400, "Google access token is required.");
+  }
+
+  await verifyGoogleAccessToken(accessToken);
+  const profile = await fetchGoogleUserInfo(accessToken);
+
+  const [existingByEmail, existingByGoogleId] = await Promise.all([
+    UserModel.findOne({ email: profile.email }),
+    UserModel.findOne({ googleId: profile.googleId }),
+  ]);
+
+  if (existingByEmail && existingByGoogleId && existingByEmail.id !== existingByGoogleId.id) {
+    throw new HttpError(
+      409,
+      "This Google account is already linked to a different user. Please contact support.",
+    );
+  }
+
+  const user = existingByEmail ?? existingByGoogleId;
+
+  if (!user) {
+    const passwordHash = await hashPassword(`google-oauth:${crypto.randomUUID()}`);
+    const createdUser = await UserModel.create({
+      name: profile.name,
+      email: profile.email,
+      passwordHash,
+      googleId: profile.googleId,
+      role: input.role === "vendor" ? "vendor" : "user",
+      status: "active",
+      profileComplete: Boolean(profile.name && profile.email),
+      isSeeded: false,
+      avatar: profile.avatar,
+      lastLoginAt: new Date(),
+    });
+
+    return createSession(createdUser, request);
+  }
+
+  if (user.status === "disabled") {
+    throw new HttpError(403, "This account has been disabled. Please contact support.");
+  }
+
+  if (user.googleId && user.googleId !== profile.googleId) {
+    throw new HttpError(409, "This email is already linked to another Google account.");
+  }
+
+  let hasChanges = false;
+
+  if (!user.googleId) {
+    user.googleId = profile.googleId;
+    hasChanges = true;
+  }
+
+  if (!user.avatar && profile.avatar) {
+    user.avatar = profile.avatar;
+    hasChanges = true;
+  }
+
+  if (!user.name && profile.name) {
+    user.name = profile.name;
+    hasChanges = true;
+  }
+
+  user.lastLoginAt = new Date();
+  user.profileComplete = Boolean(user.name && (user.email || user.phoneNumber));
+  hasChanges = true;
+
+  if (hasChanges) {
+    await user.save();
+  }
+
   return createSession(user, request);
 }
 

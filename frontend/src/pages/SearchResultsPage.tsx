@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Calendar, CheckCircle2, Crosshair, Filter, MapPin, Search, Star, X } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
@@ -82,7 +82,9 @@ export function SearchResultsPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [filtersHeight, setFiltersHeight] = useState(0);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const filtersRef = useRef<HTMLDivElement | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const handleNearMe = async () => {
@@ -117,6 +119,16 @@ export function SearchResultsPage() {
       return next;
     }, { replace: true });
   }, [searchParams, setSearchParams, stateServiceType]);
+
+  useLayoutEffect(() => {
+    const updateFiltersHeight = () => {
+      setFiltersHeight(filtersRef.current?.offsetHeight ?? 0);
+    };
+
+    updateFiltersHeight();
+    window.addEventListener("resize", updateFiltersHeight);
+    return () => window.removeEventListener("resize", updateFiltersHeight);
+  }, [showFilters]);
 
   const filters = useMemo(() => ({
     q: searchParams.get("q") ?? "",
@@ -293,7 +305,7 @@ export function SearchResultsPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f7fb]">
-      <section className="sticky top-20 z-30 border-y border-slate-200 bg-gradient-to-b from-[#edf3ff] via-[#f7faff] to-white shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+      <section ref={filtersRef} className="sticky top-20 z-30 border-y border-slate-200 bg-gradient-to-b from-[#edf3ff] via-[#f7faff] to-white shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
         <div className="mx-auto max-w-[1800px] px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -483,8 +495,8 @@ export function SearchResultsPage() {
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(330px,0.95fr)_minmax(680px,1.9fr)_minmax(300px,0.75fr)] xl:h-[calc(100vh-188px)] xl:items-start">
-          <div className="space-y-4 xl:max-h-[calc(100vh-188px)] xl:overflow-y-auto xl:pr-2">
+        <div className="grid gap-6 xl:grid-cols-[minmax(330px,0.95fr)_minmax(680px,1.9fr)_minmax(300px,0.75fr)]">
+          <div className="space-y-4 xl:pr-2">
             {error ? (
               <Card className="border border-red-200 bg-red-50 shadow-sm">
                 <CardContent className="p-6 text-sm text-red-700">{error}</CardContent>
@@ -612,10 +624,10 @@ export function SearchResultsPage() {
               </>
             )}
           </div>
-          <div className="min-h-[520px] xl:sticky xl:top-24 xl:h-[calc(100vh-188px)] xl:self-start">
-            <Card className="relative h-full overflow-hidden rounded-[24px] border border-slate-200 shadow-sm">
+          <div className="lg:sticky lg:top-[140px] lg:self-start">
+            <Card className="relative h-full overflow-visible rounded-[24px] border border-slate-200 shadow-sm">
               <div className="relative h-full p-3">
-                <div className="relative h-full min-h-[420px] overflow-hidden rounded-[20px] border border-slate-200 bg-white">
+                <div className="relative h-full min-h-[420px] overflow-hidden visible-[20px] border border-slate-200 bg-white">
                   <iframe
                     title="Search results map"
                     src={mapEmbedUrl}
@@ -660,7 +672,7 @@ export function SearchResultsPage() {
               </div>
             </Card>
           </div>
-          <div className="space-y-4 xl:max-h-[calc(100vh-188px)] xl:overflow-y-auto xl:pr-1">
+          <div className="space-y-4 xl:pr-1">
             <SearchAdvertisements
               photographers={visiblePhotographers}
               service={filters.service || filters.q}

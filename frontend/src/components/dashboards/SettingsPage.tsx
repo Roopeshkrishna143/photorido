@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ImagePlus,
   Loader2,
@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { showErrorAlert, showSuccessAlert } from "../../lib/alerts";
+import { resolvePublicAssetUrl } from "../../lib/media";
 import { uploadImageFile } from "../../lib/uploads";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings, type UserSettings } from "../../hooks/useSettings";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import {
@@ -55,6 +56,10 @@ function getInitials(name: string) {
   }
 
   return words.map((word) => word[0]?.toUpperCase() ?? "").join("");
+}
+
+function isLikelyEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function loadImage(source: string) {
@@ -297,6 +302,7 @@ export function SettingsPage() {
   const { settings, isLoading, isSaving, saveSettings } = useSettings();
   const [profileForm, setProfileForm] = useState({
     name: "",
+    email: "",
     phoneNumber: "",
     location: "",
     avatar: "",
@@ -309,14 +315,20 @@ export function SettingsPage() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
 
   useEffect(() => {
+    const normalizedEmail = user?.email ?? "";
+    const hasEmail = isLikelyEmail(normalizedEmail);
+    const fallbackPhone = user?.phoneNumber || (!hasEmail ? normalizedEmail : "");
+    const normalizedAvatar = resolvePublicAssetUrl(user?.avatar ?? "");
+
     setProfileForm({
       name: user?.name ?? "",
-      phoneNumber: user?.phoneNumber ?? "",
+      email: hasEmail ? normalizedEmail : "",
+      phoneNumber: fallbackPhone,
       location: user?.location ?? "",
-      avatar: user?.avatar ?? "",
+      avatar: normalizedAvatar,
     });
-    setAvatarPreviewUrl(user?.avatar ?? "");
-  }, [user?.avatar, user?.location, user?.name, user?.phoneNumber]);
+    setAvatarPreviewUrl(normalizedAvatar);
+  }, [user?.avatar, user?.email, user?.location, user?.name, user?.phoneNumber]);
 
   useEffect(() => {
     setSettingsForm(settings);
@@ -335,24 +347,71 @@ export function SettingsPage() {
     if (user?.role === "vendor") return "Vendor";
     return "User";
   }, [user?.role]);
-  const displayAvatar = avatarDraft?.previewUrl || avatarPreviewUrl || profileForm.avatar;
+  // Priority: live blob from open editor → saved preview URL → form avatar → user avatar
+  const displayAvatar =
+    avatarDraft?.previewUrl ||
+    (avatarPreviewUrl ? resolvePublicAssetUrl(avatarPreviewUrl) : "") ||
+    resolvePublicAssetUrl(profileForm.avatar || "") ||
+    resolvePublicAssetUrl(user?.avatar || "");
 
   const profileReadiness = user?.profileComplete ? "Profile Ready" : "Needs Attention";
 
-  const closeAvatarEditor = () => {
-    setAvatarDraft(null);
+  const closeAvatarEditor = (nextPreviewUrl?: string) => {
+    setAvatarDraft((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return null;
+    });
     setAvatarCrop(DEFAULT_AVATAR_CROP);
-    setAvatarPreviewUrl((current) =>
-      current.startsWith("blob:")
-        ? (profileForm.avatar || user?.avatar || "")
-        : current,
-    );
+    // Always use the explicitly provided URL if given; otherwise restore from current form/user state
+    if (nextPreviewUrl !== undefined) {
+      setAvatarPreviewUrl(nextPreviewUrl);
+    }
+    // If no URL given (user cancelled), avatarPreviewUrl was already set by handleAvatarUpload; leave it.
   };
 
   const handleProfileSave = async () => {
+    const normalizedName = profileForm.name.trim();
+    const normalizedEmail = profileForm.email.trim().toLowerCase();
+    const normalizedPhone = profileForm.phoneNumber.trim();
+    const normalizedLocation = profileForm.location.trim();
+
+    if (!normalizedName) {
+      await showErrorAlert("Profile update failed", {
+        text: "Please add your full name before saving.",
+      });
+      return;
+    }
+
+    if (!normalizedEmail && !normalizedPhone) {
+      await showErrorAlert("Profile update failed", {
+        text: "Please add at least one contact method (email or phone).",
+      });
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
-      await updateProfile(profileForm);
+      const updates: Partial<typeof profileForm> = {
+        name: normalizedName,
+        location: normalizedLocation,
+        avatar: profileForm.avatar,
+      };
+
+      if (normalizedEmail) {
+        updates.email = normalizedEmail;
+      }
+
+      if (normalizedPhone) {
+        updates.phoneNumber = normalizedPhone;
+      }
+
+      await updateProfile(updates);
+      setProfileForm((current) => ({
+        ...current,
+        ...updates,
+      }));
       await showSuccessAlert("Profile updated", {
         text: "Your account profile settings were updated successfully.",
       });
@@ -364,6 +423,19 @@ export function SettingsPage() {
       setIsSavingProfile(false);
     }
   };
+
+  const handlePreferenceFieldChange = useCallback(async <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+    const previousValue = settingsForm[key];
+    setSettingsForm((current) => ({ ...current, [key]: value }));
+
+    const didSave = await saveSettings({ [key]: value } as Partial<UserSettings>);
+    if (!didSave) {
+      setSettingsForm((current) => ({ ...current, [key]: previousValue }));
+      await showErrorAlert("Preference update failed", {
+        text: "We could not save that preference right now.",
+      });
+    }
+  }, [saveSettings, settingsForm]);
 
   const handlePreferenceSave = async () => {
     const didSave = await saveSettings(settingsForm);
@@ -424,9 +496,10 @@ export function SettingsPage() {
       const uploadedUrl = await uploadImageFile(croppedFile);
 
       await updateProfile({ avatar: uploadedUrl });
+      const resolvedAvatarUrl = resolvePublicAssetUrl(uploadedUrl);
       setProfileForm((current) => ({ ...current, avatar: uploadedUrl }));
-      setAvatarPreviewUrl(uploadedUrl);
-      closeAvatarEditor();
+      setAvatarPreviewUrl(resolvedAvatarUrl);
+      closeAvatarEditor(resolvedAvatarUrl);
       await showSuccessAlert("Profile image updated", {
         text: "Your new profile image is live now.",
       });
@@ -458,7 +531,14 @@ export function SettingsPage() {
             <div className="w-full max-w-[280px] rounded-[28px] border border-white/80 bg-white/90 p-5 shadow-lg shadow-slate-200/60 backdrop-blur">
               <div className="mx-auto h-40 w-40 overflow-hidden rounded-full border-[6px] border-white bg-slate-100 shadow-xl">
                 {displayAvatar ? (
-                  <img src={displayAvatar} alt={profileForm.name || "Avatar"} className="h-full w-full object-cover" />
+                  <img
+                    src={displayAvatar}
+                    alt={profileForm.name || "Avatar"}
+                    className="h-full w-full object-cover"
+                    onError={() => {
+                      setAvatarPreviewUrl("");
+                    }}
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500 text-4xl font-bold text-white">
                     {getInitials(profileForm.name || user?.name || "User")}
@@ -468,7 +548,9 @@ export function SettingsPage() {
 
               <div className="mt-5 text-center">
                 <p className="text-lg font-semibold text-slate-900">{profileForm.name || user?.name || "Your profile"}</p>
-                <p className="mt-1 text-sm text-slate-500">{user?.email || "Update your profile details below"}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {profileForm.email || profileForm.phoneNumber || "Update your profile details below"}
+                </p>
               </div>
 
               <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -517,6 +599,16 @@ export function SettingsPage() {
                     onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
                     className="h-12 rounded-2xl border-slate-200"
                     placeholder="Enter your full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-700">Email</Label>
+                  <Input
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))}
+                    className="h-12 rounded-2xl border-slate-200"
+                    placeholder="Add your email address"
                   />
                 </div>
                 <div className="space-y-2">
@@ -592,13 +684,13 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <ToggleField label="Email notifications" description="Receive important account and booking updates by email." checked={settingsForm.emailNotifications} onChange={(value) => setSettingsForm((current) => ({ ...current, emailNotifications: value }))} />
-            <ToggleField label="SMS notifications" description="Send critical booking alerts to your mobile number." checked={settingsForm.smsNotifications} onChange={(value) => setSettingsForm((current) => ({ ...current, smsNotifications: value }))} />
-            <ToggleField label="Push notifications" description="Show in-app notification prompts for new activity." checked={settingsForm.pushNotifications} onChange={(value) => setSettingsForm((current) => ({ ...current, pushNotifications: value }))} />
-            <ToggleField label="Booking alerts" description="Get notified when bookings change status or need action." checked={settingsForm.bookingAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, bookingAlerts: value }))} />
-            <ToggleField label="Message alerts" description="Get notified for new direct messages and replies." checked={settingsForm.messageAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, messageAlerts: value }))} />
-            <ToggleField label="Review alerts" description="See notifications when reviews are received or moderated." checked={settingsForm.reviewAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, reviewAlerts: value }))} />
-            <ToggleField label="Marketing updates" description="Receive product announcements, offers, and platform news." checked={settingsForm.marketingEmails} onChange={(value) => setSettingsForm((current) => ({ ...current, marketingEmails: value }))} />
+            <ToggleField label="Email notifications" description="Receive important account and booking updates by email." checked={settingsForm.emailNotifications} onChange={(value) => void handlePreferenceFieldChange("emailNotifications", value)} />
+            <ToggleField label="SMS notifications" description="Send critical booking alerts to your mobile number." checked={settingsForm.smsNotifications} onChange={(value) => void handlePreferenceFieldChange("smsNotifications", value)} />
+            <ToggleField label="Push notifications" description="Show in-app notification prompts for new activity." checked={settingsForm.pushNotifications} onChange={(value) => void handlePreferenceFieldChange("pushNotifications", value)} />
+            <ToggleField label="Booking alerts" description="Get notified when bookings change status or need action." checked={settingsForm.bookingAlerts} onChange={(value) => void handlePreferenceFieldChange("bookingAlerts", value)} />
+            <ToggleField label="Message alerts" description="Get notified for new direct messages and replies." checked={settingsForm.messageAlerts} onChange={(value) => void handlePreferenceFieldChange("messageAlerts", value)} />
+            <ToggleField label="Review alerts" description="See notifications when reviews are received or moderated." checked={settingsForm.reviewAlerts} onChange={(value) => void handlePreferenceFieldChange("reviewAlerts", value)} />
+            <ToggleField label="Marketing updates" description="Receive product announcements, offers, and platform news." checked={settingsForm.marketingEmails} onChange={(value) => void handlePreferenceFieldChange("marketingEmails", value)} />
           </CardContent>
         </Card>
 
@@ -607,20 +699,20 @@ export function SettingsPage() {
             <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-blue-600" /> Privacy and Role Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <ToggleField label="Profile visible" description="Allow your account or vendor presence to remain visible across the platform." checked={settingsForm.profileVisible} onChange={(value) => setSettingsForm((current) => ({ ...current, profileVisible: value }))} />
-            <ToggleField label="Allow direct messages" description="Let users and vendors contact you through the messaging module." checked={settingsForm.allowDirectMessages} onChange={(value) => setSettingsForm((current) => ({ ...current, allowDirectMessages: value }))} />
-            <ToggleField label="Show email on profile" description="Display your email where the platform supports public contact details." checked={settingsForm.showEmail} onChange={(value) => setSettingsForm((current) => ({ ...current, showEmail: value }))} />
-            <ToggleField label="Show phone number" description="Display your phone number where role policies allow it." checked={settingsForm.showPhoneNumber} onChange={(value) => setSettingsForm((current) => ({ ...current, showPhoneNumber: value }))} />
+            <ToggleField label="Profile visible" description="Allow your account or vendor presence to remain visible across the platform." checked={settingsForm.profileVisible} onChange={(value) => void handlePreferenceFieldChange("profileVisible", value)} />
+            <ToggleField label="Allow direct messages" description="Let users and vendors contact you through the messaging module." checked={settingsForm.allowDirectMessages} onChange={(value) => void handlePreferenceFieldChange("allowDirectMessages", value)} />
+            <ToggleField label="Show email on profile" description="Display your email where the platform supports public contact details." checked={settingsForm.showEmail} onChange={(value) => void handlePreferenceFieldChange("showEmail", value)} />
+            <ToggleField label="Show phone number" description="Display your phone number where role policies allow it." checked={settingsForm.showPhoneNumber} onChange={(value) => void handlePreferenceFieldChange("showPhoneNumber", value)} />
             {user?.role === "vendor" && (
-              <ToggleField label="Instant booking readiness" description="Mark your vendor account ready for faster booking confirmation flows." checked={settingsForm.instantBooking} onChange={(value) => setSettingsForm((current) => ({ ...current, instantBooking: value }))} />
+              <ToggleField label="Instant booking readiness" description="Mark your vendor account ready for faster booking confirmation flows." checked={settingsForm.instantBooking} onChange={(value) => void handlePreferenceFieldChange("instantBooking", value)} />
             )}
             {user?.role === "user" && (
-              <ToggleField label="Saved-profile reminders" description="Get reminders when your saved professionals become active or change details." checked={settingsForm.favoriteAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, favoriteAlerts: value }))} />
+              <ToggleField label="Saved-profile reminders" description="Get reminders when your saved professionals become active or change details." checked={settingsForm.favoriteAlerts} onChange={(value) => void handlePreferenceFieldChange("favoriteAlerts", value)} />
             )}
             {user?.role === "super-admin" && (
               <>
-                <ToggleField label="Moderation alerts" description="Get notified when reviews, profiles, or users require admin attention." checked={settingsForm.moderationAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, moderationAlerts: value }))} />
-                <ToggleField label="System alerts" description="Receive platform-level operational notices and admin summaries." checked={settingsForm.systemAlerts} onChange={(value) => setSettingsForm((current) => ({ ...current, systemAlerts: value }))} />
+                <ToggleField label="Moderation alerts" description="Get notified when reviews, profiles, or users require admin attention." checked={settingsForm.moderationAlerts} onChange={(value) => void handlePreferenceFieldChange("moderationAlerts", value)} />
+                <ToggleField label="System alerts" description="Receive platform-level operational notices and admin summaries." checked={settingsForm.systemAlerts} onChange={(value) => void handlePreferenceFieldChange("systemAlerts", value)} />
               </>
             )}
 

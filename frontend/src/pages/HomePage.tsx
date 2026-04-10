@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { CheckCircle2, Loader2, MapPin, Smartphone, Star } from "lucide-react";
+import { CheckCircle2, Loader2, MapPin, Star } from "lucide-react";
 import { HeroSearch } from "../components/HeroSearch";
 import { ServiceCategories } from "../components/ServiceCategories";
 import { HowItWorks } from "../components/HowItWorks";
@@ -272,19 +272,6 @@ export function HomePage() {
         </div>
       </section>
 
-      <div className="fixed bottom-8 right-8 z-40">
-        <button
-          onClick={() => navigate("/mobile")}
-          className="relative bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-blue-500/50 hover:scale-110 transition-all duration-300 group"
-          aria-label="Open Mobile App"
-        >
-          <Smartphone className="w-7 h-7 relative z-10" />
-          <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            View Mobile App
-          </div>
-        </button>
-        <span className="absolute inset-0 rounded-full bg-blue-600 opacity-75 animate-ping pointer-events-none"></span>
-      </div>
     </div>
   );
 }

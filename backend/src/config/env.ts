@@ -44,6 +44,8 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(14).default(12),
   JSON_BODY_LIMIT: z.string().min(2).default("20mb"),
+  // GOOGLE_CLIENT_ID: optionalTrimmedString,
+  GOOGLE_CLIENT_ID: optionalTrimmedString,
   GOOGLE_MAPS_API_KEY: optionalTrimmedString,
   MAILTRAP_API_URL: z.string().url().default("https://send.api.mailtrap.io/api/send"),
   MAILTRAP_API_TOKEN: optionalTrimmedString,

@@ -9,6 +9,7 @@ export interface User {
   name: string;
   email: string;
   passwordHash: string;
+  googleId?: string;
   role: UserRole;
   status: UserAccountStatus;
   location?: string;
@@ -40,6 +41,12 @@ const userSchema = new Schema<User>(
     passwordHash: {
       type: String,
       required: true,
+    },
+    googleId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
     },
     role: {
       type: String,

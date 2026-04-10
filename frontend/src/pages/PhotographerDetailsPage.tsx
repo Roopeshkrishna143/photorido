@@ -80,7 +80,8 @@ export function PhotographerDetailsPage() {
 
     const didCreate = await createBooking({
       userName: user.name,
-      userEmail: user.email,
+      userEmail: user.email || undefined,
+      userPhoneNumber: user.phoneNumber || undefined,
       vendorName: photographer.name,
       photographerId: photographer.id,
       listingName: photographer.services[0] ?? `${photographer.specialty} Package`,
@@ -89,7 +90,7 @@ export function PhotographerDetailsPage() {
       date: formatDateInputValue(bookingData.date),
       time: bookingTypeMap[bookingData.bookingType] ?? "Full Day",
       amount: photographer.price,
-      phoneNumber: bookingData.phoneNumber || user.phoneNumber || "",
+      phoneNumber: bookingData.phoneNumber || user.phoneNumber || user.email || undefined,
     });
 
     if (!didCreate) {

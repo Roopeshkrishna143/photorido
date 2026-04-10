@@ -15,6 +15,7 @@ import {
   refreshSession,
   requestRegistrationOtp,
   revokeRefreshToken,
+  signInWithGoogle,
   verifyRegistrationOtpAndCreateUser,
 } from "./auth.service.js";
 import { asyncHandler } from "../../utils/async-handler.js";
@@ -103,9 +104,15 @@ const avatarSchema = z.string().trim().min(1).refine(
 
 const profileSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
+  email: z.string().trim().min(1).optional(),
   phoneNumber: z.string().trim().min(7).max(20).optional(),
   location: z.string().trim().max(120).optional(),
   avatar: avatarSchema.nullable().optional(),
+});
+
+const googleAuthSchema = z.object({
+  accessToken: z.string().trim().min(1, "Google access token is required."),
+  role: z.enum(["vendor", "user"]).optional().nullable(),
 });
 
 function clearCookieOptions() {
@@ -294,12 +301,42 @@ authRouter.post(
   }),
 );
 
-authRouter.post("/google", (_request, response) => {
-  response.status(501).json({
-    success: false,
-    message: "Google login is not configured yet.",
-  });
-});
+authRouter.post(
+  "/google",
+  asyncHandler(async (request, response) => {
+    const input = googleAuthSchema.parse(request.body);
+    const session = await signInWithGoogle(
+      {
+        accessToken: input.accessToken,
+        role: input.role ?? undefined,
+      },
+      request,
+    );
+
+    setSessionCookies(response, session);
+
+    response.status(200).json({
+      success: true,
+      message: "Google login successful.",
+      data: {
+        user: session.user,
+        token: session.token,
+      },
+    });
+  }),
+);
+
+authRouter.get(
+  "/google/config",
+  asyncHandler(async (_request, response) => {
+    response.status(200).json({
+      success: true,
+      data: {
+        clientId: env.GOOGLE_CLIENT_ID ?? null,
+      },
+    });
+  }),
+);
 
 authRouter.get(
   "/me",
@@ -320,6 +357,7 @@ authRouter.patch(
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const updates = profileSchema.parse({
       name: normalizeOptionalString(request.body.name),
+      email: normalizeOptionalString(request.body.email),
       phoneNumber: normalizeOptionalString(request.body.phoneNumber),
       location: normalizeOptionalString(request.body.location),
       avatar: normalizeOptionalAvatar(request.body.avatar),
@@ -338,8 +376,46 @@ authRouter.patch(
       user.name = updates.name;
     }
 
+    if (updates.email !== undefined) {
+      const identifier = normalizeAuthIdentifier(updates.email);
+      const duplicate = await UserModel.findOne({
+        _id: { $ne: user.id },
+        ...(identifier.type === "mobile"
+          ? {
+              $or: [
+                { email: identifier.value },
+                { phoneNumber: identifier.value },
+              ],
+            }
+          : { email: identifier.value }),
+      });
+
+      if (duplicate) {
+        throw new HttpError(409, "Another user already uses this email or mobile identifier.");
+      }
+
+      user.email = identifier.value;
+    }
+
     if (updates.phoneNumber !== undefined) {
-      user.phoneNumber = updates.phoneNumber;
+      const normalizedPhoneIdentifier = normalizeAuthIdentifier(updates.phoneNumber);
+      if (normalizedPhoneIdentifier.type !== "mobile") {
+        throw new HttpError(400, "Phone number must be a valid mobile number.");
+      }
+
+      const duplicate = await UserModel.findOne({
+        _id: { $ne: user.id },
+        $or: [
+          { phoneNumber: normalizedPhoneIdentifier.value },
+          { email: normalizedPhoneIdentifier.value },
+        ],
+      });
+
+      if (duplicate) {
+        throw new HttpError(409, "Another user already uses this phone number.");
+      }
+
+      user.phoneNumber = normalizedPhoneIdentifier.value;
     }
 
     if (updates.location !== undefined) {
@@ -350,7 +426,7 @@ authRouter.patch(
       user.avatar = updates.avatar ?? undefined;
     }
 
-    user.profileComplete = Boolean(user.name && user.email);
+    user.profileComplete = Boolean(user.name && (user.email || user.phoneNumber));
     await user.save();
 
     const currentRefreshToken = extractRefreshTokenFromRequest(request);
