@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../utils/async-handler.js";
+import { requireAuth, authorizeRoles } from "../../middleware/auth.js";
 import { SearchAdvertisementModel } from "../../models/search-advertisement.model.js";
 import { buildHomeSummary } from "./site.service.js";
 
@@ -80,6 +81,52 @@ siteRouter.get(
     response.status(200).json({
       success: true,
       data: visibleAdvertisements,
+    });
+  }),
+);
+
+siteRouter.post(
+  "/search-advertisements",
+  requireAuth,
+  authorizeRoles("super-admin"),
+  asyncHandler(async (request, response) => {
+    const {
+      title,
+      subtitle,
+      description,
+      badgeText,
+      imageUrl,
+      ctaText,
+      ctaUrl,
+      serviceTags,
+      locationTags,
+      sortOrder,
+      status,
+      startDate,
+      endDate,
+    } = request.body;
+
+    const advertisement = await SearchAdvertisementModel.create({
+      title,
+      subtitle,
+      description,
+      badgeText,
+      imageUrl,
+      ctaText,
+      ctaUrl,
+      serviceTags: serviceTags || [],
+      locationTags: locationTags || [],
+      sortOrder: sortOrder || 0,
+      status: status || "active",
+      startDate,
+      endDate,
+      createdByUserId: request.authUser!.id,
+      updatedByUserId: request.authUser!.id,
+    });
+
+    response.status(201).json({
+      success: true,
+      data: advertisement,
     });
   }),
 );

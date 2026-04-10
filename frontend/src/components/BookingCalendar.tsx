@@ -132,7 +132,7 @@ export function BookingCalendar({
   };
 
   const handleSubmitRequest = async () => {
-    if (!selectedDate || !eventType || !location || !phoneNumber) {
+    if (!selectedDate || !eventType || !location) {
       setFormMessage({ tone: "error", text: "Please fill in all required booking details before continuing." });
       return;
     }
@@ -407,13 +407,13 @@ export function BookingCalendar({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone-number">Phone Number *</Label>
+                  <Label htmlFor="phone-number">Phone Number</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="phone-number"
                       type="tel"
-                      placeholder="Enter your contact number"
+                      placeholder="Enter contact number (optional if email exists)"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       className="pl-10"

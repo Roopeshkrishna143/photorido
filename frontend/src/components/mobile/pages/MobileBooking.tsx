@@ -153,8 +153,16 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
   };
 
   const handleSubmit = async () => {
-    if (!selectedDate || !eventType || !location || !phoneNumber) {
+    const resolvedPhone = phoneNumber.trim() || user?.phoneNumber?.trim() || "";
+    const resolvedEmail = user?.email?.trim() || "";
+
+    if (!selectedDate || !eventType || !location) {
       await showErrorAlert("Booking request failed", { text: "Please fill in all required fields." });
+      return;
+    }
+
+    if (!resolvedPhone && !resolvedEmail) {
+      await showErrorAlert("Booking request failed", { text: "Add at least one contact method (email or phone)." });
       return;
     }
 
@@ -192,7 +200,8 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
       setIsSubmitting(true);
       const didCreate = await createBooking({
         userName: user.name,
-        userEmail: user.email,
+        userEmail: user.email || undefined,
+        userPhoneNumber: user.phoneNumber || undefined,
         vendorName: photographer.name,
         photographerId: photographer.id,
         listingName: photographer.services[0] ?? `${photographer.specialty} Package`,
@@ -201,7 +210,7 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
         date: formatDate(selectedDate),
         time: bookingTypeMap[bookingType],
         amount: photographer.price,
-        phoneNumber,
+        phoneNumber: phoneNumber || user.phoneNumber || user.email || undefined,
       });
 
       if (!didCreate) {
@@ -429,12 +438,12 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Phone Number *</label>
+              <label className="block text-sm font-semibold mb-2">Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
                 <input
                   type="tel"
-                  placeholder="Enter your contact number"
+                  placeholder="Enter contact number (optional if email exists)"
                   value={phoneNumber}
                   onChange={(event) => setPhoneNumber(event.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-600"
@@ -502,7 +511,7 @@ export function MobileBooking({ photographerId, onBack, onComplete }: MobileBook
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-sm text-gray-600">Phone:</span>
-              <span className="font-semibold text-right">{phoneNumber}</span>
+              <span className="font-semibold text-right">{phoneNumber || user?.phoneNumber || user?.email || "Not provided"}</span>
             </div>
             {guestCount && (
               <div className="flex justify-between gap-4">

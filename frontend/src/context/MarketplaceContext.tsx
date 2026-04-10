@@ -219,7 +219,8 @@ export interface MarketplaceListing {
 
 interface CreateBookingInput {
   userName: string;
-  userEmail: string;
+  userEmail?: string;
+  userPhoneNumber?: string;
   vendorName: string;
   photographerId: string;
   listingName: string;
@@ -228,7 +229,7 @@ interface CreateBookingInput {
   date: string;
   time: string;
   amount: string;
-  phoneNumber: string;
+  phoneNumber?: string;
 }
 
 interface UpdateBookingInput {

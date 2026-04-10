@@ -78,6 +78,9 @@ export function RootLayout() {
         onDashboard={handleDashboard}
       />
 
+      {/* Spacer to push content below the fixed header (h-20 matches header height) */}
+      <div className="h-20 flex-shrink-0" />
+
       <AnimatePresence mode="wait">
         <motion.main
           key={location.pathname}

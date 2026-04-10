@@ -125,6 +125,7 @@ export function SearchResults({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[var(--blue-50)] to-white">
+      {/* Filters bar - sticky below the fixed header */}
       <div className="sticky top-20 z-40 border-b glass-strong">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
@@ -247,9 +248,13 @@ export function SearchResults({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:h-[calc(100vh-250px)]">
-          <div className="space-y-4 lg:max-h-[calc(100vh-250px)] lg:overflow-y-auto lg:pr-2">
+      {/* Main content: results list + map */}
+      <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* On mobile: stacked (list then map). On lg+: side-by-side with map sticky */}
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+
+          {/* Results list — scrollable */}
+          <div className="w-full lg:flex-1 space-y-4">
             {error ? (
               <Card className="p-12 text-center">
                 <p className="text-red-600">{error}</p>
@@ -337,18 +342,22 @@ export function SearchResults({
             )}
           </div>
 
-          <div className="min-h-[420px] lg:sticky lg:top-40 lg:h-full">
-            <Card className="h-full overflow-hidden">
-              <InteractiveMap
-                photographers={filteredPhotographers}
-                bounds={bounds}
-                selectedId={selectedId}
-                hoveredId={hoveredId}
-                onMarkerClick={handleMarkerClick}
-                onPhotographerClick={onPhotographerClick}
-              />
-            </Card>
+          {/* Map — sticky on lg+, full-width on mobile */}
+          <div className="w-full lg:w-[480px] xl:w-[540px] flex-shrink-0">
+            <div className="lg:sticky lg:top-[var(--search-map-top,_theme(spacing.24))]">
+              <Card className="overflow-hidden" style={{ height: "min(calc(100vh - 8rem), 600px)" }}>
+                <InteractiveMap
+                  photographers={filteredPhotographers}
+                  bounds={bounds}
+                  selectedId={selectedId}
+                  hoveredId={hoveredId}
+                  onMarkerClick={handleMarkerClick}
+                  onPhotographerClick={onPhotographerClick}
+                />
+              </Card>
+            </div>
           </div>
+
         </div>
       </div>
     </div>

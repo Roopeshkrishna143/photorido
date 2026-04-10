@@ -7,6 +7,7 @@ import { MarketplaceMessageModel } from "../../models/message.model.js";
 import { MarketplaceReviewModel } from "../../models/review.model.js";
 import { UserModel } from "../../models/user.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
+import { normalizeAuthIdentifier } from "../auth/auth.service.js";
 import { emitConversationChanged } from "../../realtime/socket.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -35,7 +36,8 @@ function normalizeDateOnlyValue(value: string, fieldLabel: string) {
 
 const bookingCreateSchema = z.object({
   userName: z.string().trim().min(1, "User name is required."),
-  userEmail: z.string().trim().email("A valid user email is required."),
+  userEmail: z.string().trim().min(1).optional(),
+  userPhoneNumber: z.string().trim().min(1).optional(),
   vendorName: z.string().trim().optional().default(""),
   photographerId: z.string().trim().min(1, "Profile is required."),
   listingName: z.string().trim().min(1, "Listing name is required."),
@@ -48,7 +50,10 @@ const bookingCreateSchema = z.object({
     .transform((value) => normalizeDateOnlyValue(value, "Booking date")),
   time: z.string().trim().min(1, "Booking time is required."),
   amount: z.string().trim().min(1, "Amount is required."),
-  phoneNumber: z.string().trim().min(1, "Phone number is required."),
+  phoneNumber: z.string().trim().min(1).optional(),
+}).refine((value) => Boolean(value.userEmail || value.userPhoneNumber || value.phoneNumber), {
+  message: "Provide at least one contact field (email or phone number).",
+  path: ["userEmail"],
 });
 
 const bookingUpdateSchema = z.object({
@@ -82,6 +87,54 @@ function ensureAuthUser(request: AuthenticatedRequest) {
   }
 
   return request.authUser;
+}
+
+function normalizeOptionalContactValue(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function firstContactValue(...values: Array<string | undefined>) {
+  for (const value of values) {
+    const normalized = normalizeOptionalContactValue(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
+async function findUserByBookingIdentifier(identifier: string) {
+  const normalizedIdentifier = normalizeOptionalContactValue(identifier);
+  if (!normalizedIdentifier) {
+    return null;
+  }
+
+  const userQueryCandidates: Array<Record<string, unknown>> = [];
+  const lowercaseIdentifier = normalizedIdentifier.toLowerCase();
+
+  userQueryCandidates.push({ email: lowercaseIdentifier });
+
+  try {
+    const authIdentifier = normalizeAuthIdentifier(normalizedIdentifier);
+    if (authIdentifier.type === "mobile") {
+      userQueryCandidates.push({ phoneNumber: authIdentifier.value });
+      userQueryCandidates.push({ email: authIdentifier.value });
+    } else {
+      userQueryCandidates.push({ email: authIdentifier.value });
+    }
+  } catch {
+    // Keep fallback email lookup only for non-standard identifiers.
+  }
+
+  return UserModel.findOne({
+    role: "user",
+    $or: userQueryCandidates,
+  });
 }
 
 function applyBookingStatus(booking: MarketplaceBookingDocument, status: BookingStatus) {
@@ -125,9 +178,17 @@ function applyBookingStatus(booking: MarketplaceBookingDocument, status: Booking
 }
 
 function buildPaymentInterestMessage(booking: MarketplaceBookingDocument) {
+  const contactValues = [booking.phoneNumber, booking.userEmail]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const uniqueContacts = Array.from(new Set(contactValues));
+  const contactLine = uniqueContacts.length > 0
+    ? uniqueContacts.join(" or ")
+    : "the app inbox";
+
   return [
     `Hi ${booking.vendorName}, I'm interested in your service for ${booking.listingName}.`,
-    `Please contact me on ${booking.phoneNumber} or ${booking.userEmail}.`,
+    `Please contact me on ${contactLine}.`,
     `Event: ${booking.eventType}.`,
     `Date: ${booking.date} ${booking.time}.`,
     `Location: ${booking.location}.`,
@@ -208,6 +269,7 @@ marketplaceBookingRouter.get(
       query.$or = [
         { userName: pattern },
         { userEmail: pattern },
+        { phoneNumber: pattern },
         { vendorName: pattern },
         { vendorEmail: pattern },
         { listingName: pattern },
@@ -235,10 +297,7 @@ marketplaceBookingRouter.post(
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const authUser = ensureAuthUser(request);
     const input = bookingCreateSchema.parse(request.body);
-    const [profile, userRecord] = await Promise.all([
-      VendorProfileModel.findById(input.photographerId),
-      UserModel.findOne({ email: input.userEmail.toLowerCase(), role: "user" }),
-    ]);
+    const profile = await VendorProfileModel.findById(input.photographerId);
 
     if (!profile) {
       throw new HttpError(404, "Profile not found.");
@@ -246,6 +305,27 @@ marketplaceBookingRouter.post(
 
     if (profile.status !== "approved") {
       throw new HttpError(400, "Bookings can only be created for approved profiles.");
+    }
+
+    let userRecord = authUser.role === "user"
+      ? await UserModel.findOne({ _id: authUser.id, role: "user" })
+      : null;
+
+    if (!userRecord) {
+      const identifiersToCheck = [
+        input.userEmail,
+        input.userPhoneNumber,
+        input.phoneNumber,
+      ]
+        .map((value) => normalizeOptionalContactValue(value))
+        .filter(Boolean);
+
+      for (const identifier of identifiersToCheck) {
+        userRecord = await findUserByBookingIdentifier(identifier);
+        if (userRecord) {
+          break;
+        }
+      }
     }
 
     if (!userRecord) {
@@ -256,11 +336,29 @@ marketplaceBookingRouter.post(
       throw new HttpError(403, "You can only create bookings for your own account.");
     }
 
+    const resolvedUserEmail = firstContactValue(
+      input.userEmail,
+      userRecord.email,
+      input.userPhoneNumber,
+      userRecord.phoneNumber,
+    );
+    const resolvedPhoneNumber = firstContactValue(
+      input.phoneNumber,
+      input.userPhoneNumber,
+      userRecord.phoneNumber,
+      input.userEmail,
+      userRecord.email,
+    );
+
+    if (!resolvedUserEmail || !resolvedPhoneNumber) {
+      throw new HttpError(400, "Unable to resolve booking contact details. Please include email or phone.");
+    }
+
     const vendorRecord = await UserModel.findById(profile.vendorId);
     const booking = await MarketplaceBookingModel.create({
       userId: userRecord.id,
       userName: userRecord.name,
-      userEmail: userRecord.email,
+      userEmail: resolvedUserEmail,
       vendorId: profile.vendorId,
       vendorName: profile.vendorName,
       vendorEmail: vendorRecord?.email ?? profile.vendorEmail,
@@ -271,7 +369,7 @@ marketplaceBookingRouter.post(
       date: input.date,
       time: input.time,
       amount: input.amount,
-      phoneNumber: input.phoneNumber,
+      phoneNumber: resolvedPhoneNumber,
       status: "pending",
       paymentRequested: false,
       withdrawalRequested: false,

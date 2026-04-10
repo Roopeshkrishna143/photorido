@@ -25,7 +25,7 @@ export function MobileDashboard({ onNavigate, onBack, photographers }: MobileDas
   const userBookings = useMemo(
     () =>
       bookings
-        .filter((booking) => booking.userEmail === user?.email)
+        .filter((booking) => booking.userId === user?.id || booking.userEmail === user?.email || booking.phoneNumber === user?.phoneNumber)
         .map((booking) => ({
           id: booking.id,
           photographer: photographers.find((photographer) => photographer.id === booking.photographerId),

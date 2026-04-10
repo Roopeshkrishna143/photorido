@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { api, AUTH_EXPIRED_EVENT, setStoredAuthToken, unwrapPayload } from "../lib/api";
+import { requestGoogleAccessToken } from "../lib/google-auth";
+import { resolvePublicAssetUrl } from "../lib/media";
 
 export type UserRole = "super-admin" | "vendor" | "user" | null;
 
@@ -105,7 +107,7 @@ function normalizeUser(payload: unknown): User {
       typeof profileCompleteValue === "boolean"
         ? profileCompleteValue
         : normalizeRole(raw.role) === "user",
-    avatar: avatar || undefined,
+    avatar: avatar ? resolvePublicAssetUrl(avatar) : undefined,
     phoneNumber: phoneNumber || undefined,
     location: location || undefined,
     status,
@@ -170,7 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async (role?: UserRole) => {
-    const payload = await api.post("/auth/google", { role: role ?? undefined });
+    const accessToken = await requestGoogleAccessToken();
+    const payload = await api.post("/auth/google", {
+      accessToken,
+      role: role ?? undefined,
+    });
     return applySession(payload);
   };
 
@@ -203,16 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (updates: Partial<User>) => {
     const payload = await api.patch("/auth/profile", updates);
-    const raw = unwrapPayload<unknown>(payload);
-    const nextUser = normalizeUser(isRecord(raw) && isRecord(raw.user) ? raw.user : raw);
-    const mergedUser = {
-      ...(user ?? nextUser),
-      ...nextUser,
-      ...updates,
-    };
-
-    setUser(mergedUser);
-    persistUser(mergedUser);
+    applySession(payload);
   };
 
   return (

@@ -48,6 +48,28 @@ async function ensureSettings(userId: string) {
   return settings;
 }
 
+const updateSettingsHandler = asyncHandler(async (request: AuthenticatedRequest, response) => {
+  const authUser = ensureAuthUser(request);
+  const updates = settingsSchema.parse(request.body);
+  const settings = await ensureSettings(authUser.id);
+
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      (settings as unknown as Record<string, unknown>)[key] = value;
+    }
+  });
+
+  await settings.save();
+
+  response.status(200).json({
+    success: true,
+    message: "Settings updated successfully.",
+    data: {
+      settings,
+    },
+  });
+});
+
 settingsRouter.use(requireAuth);
 
 settingsRouter.get(
@@ -65,29 +87,7 @@ settingsRouter.get(
   }),
 );
 
-settingsRouter.patch(
-  "/me",
-  asyncHandler(async (request: AuthenticatedRequest, response) => {
-    const authUser = ensureAuthUser(request);
-    const updates = settingsSchema.parse(request.body);
-    const settings = await ensureSettings(authUser.id);
-
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value !== undefined) {
-        (settings as unknown as Record<string, unknown>)[key] = value;
-      }
-    });
-
-    await settings.save();
-
-    response.status(200).json({
-      success: true,
-      message: "Settings updated successfully.",
-      data: {
-        settings,
-      },
-    });
-  }),
-);
+settingsRouter.patch("/me", updateSettingsHandler);
+settingsRouter.put("/me", updateSettingsHandler);
 
 export { settingsRouter };
