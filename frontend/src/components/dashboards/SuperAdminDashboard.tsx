@@ -106,15 +106,42 @@ function listingStatusClass(status: ListingStatus) {
 
 function roleClass(role: ManagedUserRole) {
   if (role === "super-admin") return "bg-purple-100 text-purple-700 border-purple-200";
+  if (role === "admin") return "bg-indigo-100 text-indigo-700 border-indigo-200";
   if (role === "vendor") return "bg-blue-100 text-blue-700 border-blue-200";
+  if (role === "user") return "bg-green-100 text-green-700 border-green-200";
+  if (role === "finance_manager") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (role === "marketing_manager") return "bg-amber-100 text-amber-700 border-amber-200";
+  if (role === "content_moderator") return "bg-rose-100 text-rose-700 border-rose-200";
   return "bg-green-100 text-green-700 border-green-200";
 }
 
 function roleLabel(role: ManagedUserRole) {
   if (role === "super-admin") return "Super Admin";
+  if (role === "admin") return "Admin";
   if (role === "vendor") return "Vendor";
+  if (role === "staff") return "Staff";
+  if (role === "vendor_verification_officer") return "Vendor Verification Officer";
+  if (role === "booking_coordinator") return "Booking Coordinator";
+  if (role === "support_executive") return "Support Executive";
+  if (role === "content_moderator") return "Content Moderator";
+  if (role === "finance_manager") return "Finance Manager";
+  if (role === "marketing_manager") return "Marketing Manager";
   return "User";
 }
+
+const MANAGED_ROLE_OPTIONS: Array<{ label: string; value: ManagedUserRole }> = [
+  { label: "Super Admin", value: "super-admin" },
+  { label: "Admin", value: "admin" },
+  { label: "Professional", value: "vendor" },
+  { label: "User", value: "user" },
+  { label: "Staff", value: "staff" },
+  { label: "Vendor Verification Officer", value: "vendor_verification_officer" },
+  { label: "Booking Coordinator", value: "booking_coordinator" },
+  { label: "Support Executive", value: "support_executive" },
+  { label: "Content Moderator", value: "content_moderator" },
+  { label: "Finance Manager", value: "finance_manager" },
+  { label: "Marketing Manager", value: "marketing_manager" },
+];
 
 function statusClass(status: "active" | "inactive" | "draft" | "invited" | "disabled") {
   if (status === "active") return "bg-green-100 text-green-700 border-green-200";
@@ -818,10 +845,7 @@ const defaultUserForm = {
   phoneNumber: "",
 };
 
-const USER_MODAL_ROLE_OPTIONS: Array<{ label: string; value: Extract<ManagedUserRole, "vendor" | "user"> }> = [
-  { label: "Professional", value: "vendor" },
-  { label: "User", value: "user" },
-];
+const USER_MODAL_ROLE_OPTIONS = MANAGED_ROLE_OPTIONS.filter((option) => option.value !== "super-admin");
 
 function UserManagementPage() {
   const { platformUsers, addPlatformUser, updatePlatformUser, deletePlatformUser, isMutating } = useMarketplace();
@@ -896,12 +920,13 @@ function UserManagementPage() {
       return;
     }
 
+    const phoneNumber = form.phoneNumber.trim();
     const payload = {
       ...form,
       name: form.name.trim(),
       email: form.email.trim(),
       location: form.location.trim(),
-      phoneNumber: form.phoneNumber.trim(),
+      phoneNumber: phoneNumber || undefined,
       password: form.password.trim() || undefined,
     };
 
@@ -967,7 +992,7 @@ function UserManagementPage() {
     <div className="space-y-6">
       <PageHeader
         title="User Management"
-        description="Manage super-admin, vendor, and customer accounts with modal-based create and edit flows."
+        description="Manage platform, marketplace, and operational staff accounts with modal-based create and edit flows."
         actions={
           <Button onClick={openCreateModal} className="gap-2 bg-blue-600 text-white hover:bg-blue-700">
             <Plus className="h-4 w-4" />
@@ -982,9 +1007,7 @@ function UserManagementPage() {
           onChange={setFilter}
           options={[
             { label: "All", value: "all" },
-            { label: "Super-Admin", value: "super-admin" },
-            { label: "Vendor", value: "vendor" },
-            { label: "User", value: "user" },
+            ...MANAGED_ROLE_OPTIONS.map((option) => ({ label: option.label, value: option.value })),
           ]}
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1069,11 +1092,11 @@ function UserManagementPage() {
               <Input value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} placeholder="Phone number" className="rounded-xl border-gray-200" />
               <Input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder={editingId ? "New password (optional)" : "Password"} className="rounded-xl border-gray-200" />
               <select
-                value={form.role === "super-admin" ? "user" : form.role}
+                value={form.role === "super-admin" ? "admin" : form.role}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    role: event.target.value as Extract<ManagedUserRole, "vendor" | "user">,
+                    role: event.target.value as ManagedUserRole,
                   }))
                 }
                 className={FIELD_CLASS}
@@ -1163,9 +1186,9 @@ function PermissionsPage() {
             <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Permission name" className="rounded-xl border-gray-200" />
             <Input value={form.module} onChange={(event) => setForm((current) => ({ ...current, module: event.target.value }))} placeholder="Module" className="rounded-xl border-gray-200" />
             <select value={form.audience} onChange={(event) => setForm((current) => ({ ...current, audience: event.target.value as ManagedUserRole }))} className={FIELD_CLASS}>
-              <option value="super-admin">Super-Admin</option>
-              <option value="vendor">Vendor</option>
-              <option value="user">User</option>
+              {MANAGED_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
             <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as MarketplacePermission["status"] }))} className={FIELD_CLASS}>
               <option value="active">Active</option>

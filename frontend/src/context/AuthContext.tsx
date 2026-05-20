@@ -3,7 +3,19 @@ import { api, AUTH_EXPIRED_EVENT, setStoredAuthToken, unwrapPayload } from "../l
 import { requestGoogleAccessToken } from "../lib/google-auth";
 import { resolvePublicAssetUrl } from "../lib/media";
 
-export type UserRole = "super-admin" | "vendor" | "user" | null;
+export type UserRole =
+  | "super-admin"
+  | "admin"
+  | "vendor"
+  | "user"
+  | "staff"
+  | "vendor_verification_officer"
+  | "booking_coordinator"
+  | "support_executive"
+  | "content_moderator"
+  | "finance_manager"
+  | "marketing_manager"
+  | null;
 
 export interface User {
   id: string;
@@ -57,11 +69,23 @@ function readStoredUser() {
 }
 
 function normalizeRole(value: unknown): UserRole {
-  if (value === "super-admin" || value === "vendor" || value === "user") {
+  if (
+    value === "super-admin" ||
+    value === "admin" ||
+    value === "vendor" ||
+    value === "user" ||
+    value === "staff" ||
+    value === "vendor_verification_officer" ||
+    value === "booking_coordinator" ||
+    value === "support_executive" ||
+    value === "content_moderator" ||
+    value === "finance_manager" ||
+    value === "marketing_manager"
+  ) {
     return value;
   }
 
-  if (value === "super_admin" || value === "admin") {
+  if (value === "super_admin") {
     return "super-admin";
   }
 

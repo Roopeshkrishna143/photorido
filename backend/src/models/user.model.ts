@@ -1,6 +1,18 @@
 import { Schema, model, type HydratedDocument } from "mongoose";
 
-export const USER_ROLES = ["super-admin", "vendor", "user"] as const;
+export const USER_ROLES = [
+  "super-admin",
+  "admin",
+  "vendor",
+  "user",
+  "staff",
+  "vendor_verification_officer",
+  "booking_coordinator",
+  "support_executive",
+  "content_moderator",
+  "finance_manager",
+  "marketing_manager",
+] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 export const USER_ACCOUNT_STATUSES = ["active", "invited", "disabled"] as const;
 export type UserAccountStatus = (typeof USER_ACCOUNT_STATUSES)[number];

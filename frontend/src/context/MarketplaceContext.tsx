@@ -3,7 +3,18 @@ import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { api, getErrorMessage, getStoredAuthToken, unwrapArray, unwrapPayload } from "../lib/api";
 
-export type ManagedUserRole = "super-admin" | "vendor" | "user";
+export type ManagedUserRole =
+  | "super-admin"
+  | "admin"
+  | "vendor"
+  | "user"
+  | "staff"
+  | "vendor_verification_officer"
+  | "booking_coordinator"
+  | "support_executive"
+  | "content_moderator"
+  | "finance_manager"
+  | "marketing_manager";
 export type BookingStatus =
   | "pending"
   | "approved_by_vendor"
@@ -453,6 +464,24 @@ const RESOURCE_ENDPOINTS = {
 const ROLE_RESOURCE_MAP: Record<ManagedUserRole, (keyof MarketplaceSnapshot)[]> = {
   user: ["bookings", "conversations", "notifications", "reviews"],
   vendor: ["bookings", "conversations", "notifications", "reviews", "categories", "subCategories", "listings"],
+  admin: [
+    "bookings",
+    "notifications",
+    "reviews",
+    "platformUsers",
+    "categories",
+    "browseServiceCards",
+    "searchAdvertisements",
+    "subCategories",
+    "listings",
+  ],
+  staff: ["bookings", "notifications", "platformUsers", "listings"],
+  vendor_verification_officer: ["notifications", "categories", "subCategories", "listings"],
+  booking_coordinator: ["bookings", "notifications"],
+  support_executive: ["notifications", "platformUsers"],
+  content_moderator: ["notifications", "reviews", "listings"],
+  finance_manager: ["bookings", "notifications"],
+  marketing_manager: ["notifications", "browseServiceCards", "searchAdvertisements", "listings"],
   "super-admin": [
     "bookings",
     "conversations",

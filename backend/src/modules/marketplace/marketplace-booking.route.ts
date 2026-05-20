@@ -401,7 +401,7 @@ marketplaceBookingRouter.post(
 
 marketplaceBookingRouter.patch(
   "/bookings/:bookingId",
-  authorizePermissions("manage_bookings"),
+  authorizePermissions("manage_bookings", "reassign_booking_status", "reschedule_booking"),
   asyncHandler(async (request, response) => {
     const input = bookingUpdateSchema.parse(request.body);
     const booking = await MarketplaceBookingModel.findById(request.params.bookingId);

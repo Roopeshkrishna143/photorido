@@ -26,7 +26,7 @@ import {
   type SearchAdvertisementDocument,
 } from "../../models/search-advertisement.model.js";
 import { SubCategoryModel, type SubCategoryDocument } from "../../models/sub-category.model.js";
-import { UserModel, type UserDocument, type UserRole } from "../../models/user.model.js";
+import { USER_ROLES, UserModel, type UserDocument, type UserRole } from "../../models/user.model.js";
 import { VendorProfileModel, type VendorProfileDocument } from "../../models/vendor-profile.model.js";
 import { VendorScheduleModel, type VendorScheduleDocument } from "../../models/vendor-schedule.model.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -137,13 +137,14 @@ export function serializeNotification(notification: MarketplaceNotificationDocum
 }
 
 export function serializePlatformUser(user: UserDocument) {
-  const normalizedRole = user.role === "super-admin" || user.role === "vendor" || user.role === "user"
-    ? user.role
-    : user.role === "super_admin" || user.role === "admin"
+  const rawRole = String(user.role);
+  const normalizedRole = USER_ROLES.includes(rawRole as UserRole)
+    ? rawRole as UserRole
+    : rawRole === "super_admin"
       ? "super-admin"
-      : user.role === "consumer" || user.role === "customer"
+      : rawRole === "consumer" || rawRole === "customer"
         ? "user"
-        : user.role === "professional"
+        : rawRole === "professional"
           ? "vendor"
           : "user";
   const normalizedStatus = user.status === "active" || user.status === "invited" || user.status === "disabled"

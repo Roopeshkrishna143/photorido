@@ -15,6 +15,7 @@ import {
   LogOut,
   Megaphone,
   MessageSquare,
+  Scale,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -93,21 +94,61 @@ const USER_NAV: NavCategory[] = [
   },
 ];
 
+const OPERATIONS_NAV: NavCategory[] = [
+  {
+    title: "Operations",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Verification", icon: ShieldCheck, key: "verification" },
+      { label: "Bookings", icon: BookOpen, key: "operations" },
+      { label: "Support", icon: MessageSquare, key: "support" },
+      { label: "Moderation", icon: ClipboardCheck, key: "moderation" },
+      { label: "Finance", icon: Scale, key: "finance" },
+      { label: "Marketing", icon: Megaphone, key: "marketing" },
+    ],
+  },
+];
+
 function getNavForRole(role: UserRole): NavCategory[] {
   if (role === "super-admin") return SUPER_ADMIN_NAV;
+  if (role === "admin") return SUPER_ADMIN_NAV;
   if (role === "vendor") return VENDOR_NAV;
+  if (
+    role === "staff" ||
+    role === "vendor_verification_officer" ||
+    role === "booking_coordinator" ||
+    role === "support_executive" ||
+    role === "content_moderator" ||
+    role === "finance_manager" ||
+    role === "marketing_manager"
+  ) {
+    return OPERATIONS_NAV;
+  }
   return USER_NAV;
 }
 
 function getRoleLabel(role: UserRole) {
   if (role === "super-admin") return "Super Admin";
+  if (role === "admin") return "Admin";
   if (role === "vendor") return "Professional";
+  if (role === "staff") return "Staff";
+  if (role === "vendor_verification_officer") return "Verification Officer";
+  if (role === "booking_coordinator") return "Booking Coordinator";
+  if (role === "support_executive") return "Support Executive";
+  if (role === "content_moderator") return "Content Moderator";
+  if (role === "finance_manager") return "Finance Manager";
+  if (role === "marketing_manager") return "Marketing Manager";
   return "User";
 }
 
 function getRoleBadgeColor(role: UserRole) {
   if (role === "super-admin") return "bg-purple-100 text-purple-700 border-purple-200";
+  if (role === "admin") return "bg-indigo-100 text-indigo-700 border-indigo-200";
   if (role === "vendor") return "bg-blue-100 text-blue-700 border-blue-200";
+  if (role === "user") return "bg-green-100 text-green-700 border-green-200";
+  if (role === "finance_manager") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (role === "marketing_manager") return "bg-amber-100 text-amber-700 border-amber-200";
+  if (role) return "bg-slate-100 text-slate-700 border-slate-200";
   return "bg-green-100 text-green-700 border-green-200";
 }
 
@@ -125,7 +166,7 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
 
   const navCategories = getNavForRole(user?.role ?? null);
-  const roleKey = user?.role === "vendor" || user?.role === "super-admin" ? user.role : "user";
+  const roleKey = user?.role ?? "user";
   const unreadNotifications = notifications.filter((notification) => notification.role === roleKey && !notification.read).length;
   const unreadMessages =
     user?.role === "user"

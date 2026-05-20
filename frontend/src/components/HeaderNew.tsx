@@ -51,10 +51,23 @@ export function HeaderNew({
 
   const getRoleLabel = () => {
     if (user?.role === "super-admin") return "Super Admin";
+    if (user?.role === "admin") return "Admin";
     if (user?.role === "vendor") return "Professional";
+    if (user?.role === "staff") return "Staff";
+    if (user?.role === "vendor_verification_officer")
+      return "Verification Officer";
+    if (user?.role === "booking_coordinator") return "Booking Coordinator";
+    if (user?.role === "support_executive") return "Support Executive";
+    if (user?.role === "content_moderator") return "Content Moderator";
+    if (user?.role === "finance_manager") return "Finance Manager";
+    if (user?.role === "marketing_manager") return "Marketing Manager";
     if (user?.role === "user") return "User";
     return "Guest";
   };
+
+  const isInternalRole = Boolean(
+    user?.role && user.role !== "vendor" && user.role !== "user",
+  );
 
   return (
     <>
@@ -111,7 +124,7 @@ export function HeaderNew({
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
               {/* Become a Pro — hidden for vendors, shown on md+ desktop */}
-              {user?.role !== "vendor" && user?.role !== "super-admin" && (
+              {user?.role !== "vendor" && !isInternalRole && (
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -277,7 +290,7 @@ export function HeaderNew({
                 Help
               </button>
 
-              {user?.role !== "vendor" && user?.role !== "super-admin" && (
+              {user?.role !== "vendor" && !isInternalRole && (
                 <button
                   onClick={() => {
                     onBecomePro?.();

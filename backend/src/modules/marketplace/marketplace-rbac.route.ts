@@ -5,7 +5,7 @@ import { MarketplaceBookingModel } from "../../models/booking.model.js";
 import { MarketplacePermissionModel } from "../../models/permission.model.js";
 import { MarketplaceReviewModel } from "../../models/review.model.js";
 import { MarketplaceRoleDefinitionModel } from "../../models/role-definition.model.js";
-import { UserModel } from "../../models/user.model.js";
+import { USER_ROLES, UserModel } from "../../models/user.model.js";
 import { VendorProfileModel } from "../../models/vendor-profile.model.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -21,7 +21,7 @@ import {
 const permissionSchema = z.object({
   name: z.string().trim().min(1, "Permission name is required."),
   module: z.string().trim().min(1, "Module is required."),
-  audience: z.enum(["super-admin", "vendor", "user"]),
+  audience: z.enum(USER_ROLES),
   description: z.string().trim().min(1, "Description is required."),
   status: z.enum(["active", "draft"]),
 });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
+import { requireAuth, authorizePermissions, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
 import { UserModel } from "../../models/user.model.js";
 import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
@@ -141,7 +141,7 @@ marketplaceRouter.use(requireAuth);
 
 marketplaceRouter.get(
   "/users",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users", "view_users_limited", "view_vendors_limited"),
   asyncHandler(async (_request, response) => {
     const users = await UserModel.find().sort({ createdAt: -1 });
     response.status(200).json({
@@ -228,7 +228,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/categories",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -255,7 +255,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/categories/:categoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request, response) => {
     const input = categorySchema.parse(request.body);
     const category = await CategoryModel.findById(request.params.categoryId);
@@ -293,7 +293,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/categories/:categoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request, response) => {
     const category = await CategoryModel.findById(request.params.categoryId);
     if (!category) {
@@ -324,7 +324,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/browse-services",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -351,7 +351,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/browse-services/:browseServiceCardId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request, response) => {
     const input = browseServiceCardSchema.parse(request.body);
     const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
@@ -384,7 +384,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/browse-services/:browseServiceCardId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request, response) => {
     const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
     if (!browseServiceCard) {
@@ -402,7 +402,7 @@ marketplaceRouter.delete(
 
 marketplaceRouter.get(
   "/search-advertisements",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (_request, response) => {
     const advertisements = await SearchAdvertisementModel.find().sort({
       sortOrder: 1,
@@ -418,7 +418,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/search-advertisements",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -460,7 +460,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/search-advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -504,7 +504,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/search-advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request, response) => {
     const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
     if (!advertisement) {
@@ -536,7 +536,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/sub-categories",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -571,7 +571,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/sub-categories/:subCategoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request, response) => {
     const input = subCategorySchema.parse(request.body);
     const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
@@ -619,7 +619,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/sub-categories/:subCategoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request, response) => {
     const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
     if (!subCategory) {
@@ -657,7 +657,8 @@ marketplaceRouter.get(
       throw new HttpError(401, "Authentication is required.");
     }
 
-    const query = request.authUser.role === "super-admin"
+    const isOperationalRole = request.authUser.role !== "vendor" && request.authUser.role !== "user";
+    const query = isOperationalRole
       ? {}
       : request.authUser.role === "vendor"
         ? { vendorId: request.authUser.id }
@@ -791,7 +792,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.post(
   "/listings/:listingId/approve",
-  authorizeRoles("super-admin"),
+  authorizePermissions("moderate_profiles", "verify_vendor", "change_verification_status"),
   asyncHandler(async (request, response) => {
     const listing = await VendorProfileModel.findById(request.params.listingId);
     if (!listing) {
@@ -815,7 +816,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.post(
   "/listings/:listingId/reject",
-  authorizeRoles("super-admin"),
+  authorizePermissions("moderate_profiles", "reject_vendor", "change_verification_status"),
   asyncHandler(async (request, response) => {
     const listing = await VendorProfileModel.findById(request.params.listingId);
     if (!listing) {

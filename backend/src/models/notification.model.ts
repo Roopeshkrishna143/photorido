@@ -1,5 +1,5 @@
 import { Schema, model, type HydratedDocument } from "mongoose";
-import type { UserRole } from "./user.model.js";
+import { USER_ROLES, type UserRole } from "./user.model.js";
 
 export interface MarketplaceNotification {
   recipientUserId: string;
@@ -23,7 +23,7 @@ const marketplaceNotificationSchema = new Schema<MarketplaceNotification>(
     },
     role: {
       type: String,
-      enum: ["super-admin", "vendor", "user"],
+      enum: USER_ROLES,
       required: true,
       index: true,
     },
