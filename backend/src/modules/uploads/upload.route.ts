@@ -7,13 +7,25 @@ import { asyncHandler } from "../../utils/async-handler.js";
 import { HttpError } from "../../utils/http-error.js";
 
 const uploadRouter = Router();
-const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const allowedDocumentTypes = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 const maxSizeBytes = 8 * 1024 * 1024;
 const uploadRoot = path.resolve(process.cwd(), "uploads");
 const imagesRoot = path.join(uploadRoot, "images");
+const documentsRoot = path.join(uploadRoot, "documents");
 
 async function ensureUploadFolders() {
-  await fs.mkdir(imagesRoot, { recursive: true });
+  await Promise.all([
+    fs.mkdir(imagesRoot, { recursive: true }),
+    fs.mkdir(documentsRoot, { recursive: true }),
+  ]);
 }
 
 function sanitizeFileName(fileName: string) {
@@ -31,6 +43,23 @@ function buildFileName(originalFileName: string, contentType: string) {
   return `${Date.now()}-${crypto.randomUUID()}-${safeBaseName}${extension}`;
 }
 
+function buildDocumentFileName(originalFileName: string, contentType: string) {
+  const extension = contentType === "application/pdf"
+    ? ".pdf"
+    : contentType === "image/png"
+      ? ".png"
+      : contentType === "image/webp"
+        ? ".webp"
+        : contentType === "application/msword"
+          ? ".doc"
+          : contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ? ".docx"
+            : ".jpg";
+  const baseName = path.basename(originalFileName || "document").replace(path.extname(originalFileName || ""), "");
+  const safeBaseName = sanitizeFileName(baseName) || "document";
+  return `${Date.now()}-${crypto.randomUUID()}-${safeBaseName}${extension}`;
+}
+
 uploadRouter.use(requireAuth);
 
 uploadRouter.post(
@@ -43,7 +72,7 @@ uploadRouter.post(
     }
 
     const contentType = String(request.headers["content-type"] || "").toLowerCase();
-    if (!allowedTypes.has(contentType)) {
+    if (!allowedImageTypes.has(contentType)) {
       throw new HttpError(415, "Only JPG, PNG, and WEBP images are supported.");
     }
 
@@ -67,6 +96,50 @@ uploadRouter.post(
       data: {
         fileName,
         url: `/uploads/images/${fileName}`,
+        uploadedBy: authUser.id,
+      },
+    });
+  }),
+);
+
+uploadRouter.post(
+  "/documents",
+  express.raw({ type: Array.from(allowedDocumentTypes), limit: `${maxSizeBytes}` }),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const contentType = String(request.headers["content-type"] || "").toLowerCase();
+    if (!allowedDocumentTypes.has(contentType)) {
+      throw new HttpError(415, "Only PDF, DOC, DOCX, JPG, PNG, and WEBP documents are supported.");
+    }
+
+    const fileBuffer = Buffer.isBuffer(request.body) ? request.body : Buffer.from([]);
+    if (fileBuffer.length === 0) {
+      throw new HttpError(400, "Upload body is empty.");
+    }
+
+    if (fileBuffer.length > maxSizeBytes) {
+      throw new HttpError(413, "Document exceeds the maximum upload size.");
+    }
+
+    const originalName = String(request.headers["x-file-name"] || "document");
+    const fileName = buildDocumentFileName(originalName, contentType);
+    await ensureUploadFolders();
+    await fs.writeFile(path.join(documentsRoot, fileName), fileBuffer);
+
+    response.status(201).json({
+      success: true,
+      message: "Document uploaded successfully.",
+      data: {
+        fileName,
+        originalName,
+        url: `/uploads/documents/${fileName}`,
+        contentType,
+        size: fileBuffer.length,
+        uploadedAt: new Date().toISOString(),
         uploadedBy: authUser.id,
       },
     });

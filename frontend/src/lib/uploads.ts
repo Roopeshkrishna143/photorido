@@ -17,3 +17,30 @@ export async function uploadImageFile(file: File) {
 
   return resolvePublicAssetUrl(uploadUrl);
 }
+
+export interface UploadedDocument {
+  fileName: string;
+  originalName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+export async function uploadDocumentFile(file: File) {
+  const payload = await api.post("/uploads/documents", file, {
+    headers: {
+      "Content-Type": file.type || "application/pdf",
+      "X-File-Name": file.name,
+    },
+  });
+
+  const data = unwrapPayload<UploadedDocument>(payload);
+  if (!data?.url) {
+    throw new Error("Document upload completed, but no document URL was returned.");
+  }
+
+  return {
+    ...data,
+  };
+}

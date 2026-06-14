@@ -14,6 +14,15 @@ export interface VendorProfileYoutubeLink {
   videoId?: string | null;
 }
 
+export interface VendorProfileDocumentUpload {
+  fileName: string;
+  originalName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface VendorProfileImageCrop {
   zoom: number;
   x: number;
@@ -51,6 +60,16 @@ export interface VendorProfile {
   albums: VendorProfileAlbum[];
   youtubeLinks: VendorProfileYoutubeLink[];
   status: VendorProfileStatus;
+  verificationNote?: string;
+  requestedDocuments?: string[];
+  documentRequestMessage?: string;
+  documentUploads?: VendorProfileDocumentUpload[];
+  documentsRequestedAt?: Date | null;
+  documentsSubmittedAt?: Date | null;
+  verificationStatusChangedAt?: Date | null;
+  mediaModerationNote?: string;
+  mediaWarnedAt?: Date | null;
+  mediaBanEscalatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +98,18 @@ const youtubeLinkSchema = new Schema<VendorProfileYoutubeLink>(
     url: { type: String, required: true, trim: true },
     thumb: { type: String, trim: true, default: null },
     videoId: { type: String, trim: true, default: null },
+  },
+  { _id: false },
+);
+
+const documentUploadSchema = new Schema<VendorProfileDocumentUpload>(
+  {
+    fileName: { type: String, required: true, trim: true },
+    originalName: { type: String, required: true, trim: true },
+    url: { type: String, required: true, trim: true },
+    contentType: { type: String, required: true, trim: true },
+    size: { type: Number, required: true, min: 0 },
+    uploadedAt: { type: Date, default: Date.now },
   },
   { _id: false },
 );
@@ -217,6 +248,49 @@ const vendorProfileSchema = new Schema<VendorProfile>(
       default: "pending",
       required: true,
       index: true,
+    },
+    verificationNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    requestedDocuments: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
+    documentRequestMessage: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    documentUploads: {
+      type: [documentUploadSchema],
+      default: [],
+    },
+    documentsRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    documentsSubmittedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationStatusChangedAt: {
+      type: Date,
+      default: null,
+    },
+    mediaModerationNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    mediaWarnedAt: {
+      type: Date,
+      default: null,
+    },
+    mediaBanEscalatedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

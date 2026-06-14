@@ -19,6 +19,26 @@ const DEFAULT_USERS: Array<{ name: string; email: string; role: UserRole }> = [
     email: "user@photorido.com",
     role: "user",
   },
+  {
+    name: "Vendor Verification Officer",
+    email: "verification@photorido.com",
+    role: "vendor_verification_officer",
+  },
+  {
+    name: "Booking Coordinator",
+    email: "booking.coordinator@photorido.com",
+    role: "booking_coordinator",
+  },
+  {
+    name: "Support Executive",
+    email: "support@photorido.com",
+    role: "support_executive",
+  },
+  {
+    name: "Content Moderator",
+    email: "moderator@photorido.com",
+    role: "content_moderator",
+  },
 ];
 
 export async function seedDefaultUsers() {

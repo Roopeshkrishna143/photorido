@@ -13,6 +13,10 @@ export interface MarketplaceReviewRecord {
   comment: string;
   vendorResponse?: string | null;
   respondedAt?: Date | null;
+  moderationStatus: "active" | "hidden" | "removed";
+  moderationNote?: string;
+  warnedAt?: Date | null;
+  banEscalatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +90,26 @@ const marketplaceReviewSchema = new Schema<MarketplaceReviewRecord>(
       default: null,
     },
     respondedAt: {
+      type: Date,
+      default: null,
+    },
+    moderationStatus: {
+      type: String,
+      enum: ["active", "hidden", "removed"],
+      default: "active",
+      required: true,
+      index: true,
+    },
+    moderationNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    warnedAt: {
+      type: Date,
+      default: null,
+    },
+    banEscalatedAt: {
       type: Date,
       default: null,
     },

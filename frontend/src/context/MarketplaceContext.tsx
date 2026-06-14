@@ -75,6 +75,16 @@ export interface MarketplaceBooking {
   paymentRequested: boolean;
   withdrawalRequested: boolean;
   reviewSubmitted?: boolean;
+  operationsNote?: string;
+  escalatedAt?: string | null;
+  escalationResolvedAt?: string | null;
+  rescheduledAt?: string | null;
+  rescheduleResolvedAt?: string | null;
+  activityHistory?: Array<{
+    type: string;
+    note: string;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -102,6 +112,10 @@ export interface MarketplaceReview {
   comment: string;
   vendorResponse?: string | null;
   respondedAt?: string | null;
+  moderationStatus?: "active" | "hidden" | "removed";
+  moderationNote?: string;
+  warnedAt?: string | null;
+  banEscalatedAt?: string | null;
   createdAt: string;
 }
 
@@ -224,6 +238,23 @@ export interface MarketplaceListing {
     videoId?: string | null;
   }>;
   status: ListingStatus;
+  verificationNote?: string;
+  requestedDocuments?: string[];
+  documentRequestMessage?: string;
+  documentUploads?: Array<{
+    fileName: string;
+    originalName: string;
+    url: string;
+    contentType: string;
+    size: number;
+    uploadedAt: string;
+  }>;
+  documentsRequestedAt?: string | null;
+  documentsSubmittedAt?: string | null;
+  verificationStatusChangedAt?: string | null;
+  mediaModerationNote?: string;
+  mediaWarnedAt?: string | null;
+  mediaBanEscalatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -476,7 +507,7 @@ const ROLE_RESOURCE_MAP: Record<ManagedUserRole, (keyof MarketplaceSnapshot)[]> 
     "listings",
   ],
   staff: ["bookings", "notifications", "platformUsers", "listings"],
-  vendor_verification_officer: ["notifications", "categories", "subCategories", "listings"],
+  vendor_verification_officer: ["notifications", "platformUsers", "categories", "subCategories", "listings"],
   booking_coordinator: ["bookings", "notifications"],
   support_executive: ["notifications", "platformUsers"],
   content_moderator: ["notifications", "reviews", "listings"],

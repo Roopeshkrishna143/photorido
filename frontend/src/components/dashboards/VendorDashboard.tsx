@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
   Area,
@@ -12,6 +12,8 @@ import {
 import {
   CalendarCheck,
   Eye,
+  FileText,
+  FileWarning,
   ListChecks,
   MessageCircle,
   Plus,
@@ -22,7 +24,9 @@ import {
 import { useMarketplace } from "../../context/MarketplaceContext";
 import { useVendorAnalytics } from "../../hooks/useVendorData";
 import { useVendorSavedProfiles } from "../../hooks/useVendorSavedProfiles";
-import { formatDisplayDate } from "../../lib/date";
+import { api } from "../../lib/api";
+import { uploadDocumentFile } from "../../lib/uploads";
+import { formatDisplayDate, formatDisplayDateTime } from "../../lib/date";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { DashboardSidebar } from "./DashboardSidebar";
@@ -77,6 +81,13 @@ function VendorOverview() {
   const vendorBookings = useMemo(() => bookings, [bookings]);
   const vendorConversations = useMemo(() => conversations, [conversations]);
   const vendorListings = useMemo(() => listings, [listings]);
+  const requestedDocumentProfiles = useMemo(
+    () =>
+      vendorListings.filter(
+        (listing) => listing.documentsRequestedAt && !listing.documentsSubmittedAt,
+      ),
+    [vendorListings],
+  );
   const vendorNotifications = useMemo(
     () => notifications.filter((notification) => notification.role === "vendor"),
     [notifications],
@@ -132,6 +143,44 @@ function VendorOverview() {
         <VendorMetricCard label="Total Leads" value={summary.totalLeads.toLocaleString("en-IN")} helper="Booking enquiries received" icon={MessageCircle} gradient="from-emerald-500 to-green-600" />
         <VendorMetricCard label="Times Booked" value={summary.timesBooked.toLocaleString("en-IN")} helper="Approved, confirmed, or completed bookings" icon={CalendarCheck} gradient="from-pink-500 to-rose-500" />
       </div>
+
+      {requestedDocumentProfiles.length > 0 && (
+        <Card className="border border-amber-100 bg-amber-50/60 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-amber-900">
+              <FileWarning className="h-4 w-4" />
+              Verification Documents Requested
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {requestedDocumentProfiles.map((listing) => (
+              <div key={listing.id} className="rounded-2xl border border-amber-100 bg-white px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{listing.title}</p>
+                    {listing.requestedDocuments && listing.requestedDocuments.length > 0 && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Requested: {listing.requestedDocuments.join(", ")}
+                      </p>
+                    )}
+                    <p className="mt-1 text-sm text-gray-600">
+                      {listing.documentRequestMessage || listing.verificationNote || "Please update this profile with the requested documents."}
+                    </p>
+                    {listing.documentsRequestedAt && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Requested {formatDisplayDateTime(listing.documentsRequestedAt)}
+                      </p>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" className="rounded-xl" onClick={() => navigate("/dashboard?tab=listings")}>
+                    Update Documents
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-6">
         <Card className="border border-gray-100 shadow-sm">
@@ -293,8 +342,41 @@ function ListingsPage({
   onAddListing: () => void;
   onEditListing: (listingId: string) => void;
 }) {
-  const { listings, reviews, isLoading } = useMarketplace();
+  const { listings, reviews, isLoading, refreshMarketplace } = useMarketplace();
   const vendorListings = listings;
+  const [submittingDocumentId, setSubmittingDocumentId] = useState<string | null>(null);
+  const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
+  const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
+  const documentRequests = vendorListings.filter(
+    (listing) => listing.documentsRequestedAt && !listing.documentsSubmittedAt,
+  );
+
+  const uploadRequestedDocuments = async (listingId: string, files: FileList | null) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setUploadingDocumentId(listingId);
+    try {
+      const uploads = await Promise.all(selectedFiles.map((file) => uploadDocumentFile(file)));
+      await api.post(`/marketplace/listings/${listingId}/document-uploads`, { uploads });
+      await refreshMarketplace();
+    } finally {
+      setUploadingDocumentId(null);
+      if (fileInputsRef.current[listingId]) {
+        fileInputsRef.current[listingId]!.value = "";
+      }
+    }
+  };
+
+  const submitRequestedDocuments = async (listingId: string) => {
+    setSubmittingDocumentId(listingId);
+    try {
+      await api.post(`/marketplace/listings/${listingId}/submit-documents`);
+      await refreshMarketplace();
+    } finally {
+      setSubmittingDocumentId(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -325,8 +407,92 @@ function ListingsPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {vendorListings.map((listing) => (
+        <div className="space-y-5">
+          {documentRequests.length > 0 && (
+            <Card className="border border-amber-100 bg-amber-50/60 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-amber-900">
+                  <FileWarning className="h-4 w-4" />
+                  Document Requests
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {documentRequests.map((listing) => (
+                  <div key={listing.id} className="rounded-2xl border border-amber-100 bg-white px-4 py-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900">{listing.title}</p>
+                        {listing.requestedDocuments && listing.requestedDocuments.length > 0 && (
+                          <p className="mt-1 text-sm text-amber-800">
+                            Requested: {listing.requestedDocuments.join(", ")}
+                          </p>
+                        )}
+                        <p className="mt-2 text-sm text-gray-600">
+                          {listing.documentRequestMessage || listing.verificationNote || "Please update the requested profile documents."}
+                        </p>
+                        {listing.documentsRequestedAt && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Requested {formatDisplayDateTime(listing.documentsRequestedAt)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          ref={(input) => {
+                            fileInputsRef.current[listing.id] = input;
+                          }}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                          onChange={(event) => void uploadRequestedDocuments(listing.id, event.target.files)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          disabled={uploadingDocumentId === listing.id}
+                          onClick={() => fileInputsRef.current[listing.id]?.click()}
+                        >
+                          {uploadingDocumentId === listing.id ? "Uploading..." : "Upload / Update"}
+                        </Button>
+                        <Button
+                          type="button"
+                          className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                          disabled={submittingDocumentId === listing.id || (listing.documentUploads?.length ?? 0) === 0}
+                          onClick={() => void submitRequestedDocuments(listing.id)}
+                        >
+                          Submit Documents
+                        </Button>
+                      </div>
+                    </div>
+                    {listing.documentUploads && listing.documentUploads.length > 0 && (
+                      <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                        <p className="text-xs font-semibold text-gray-600">Attached files</p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {listing.documentUploads.map((document) => (
+                            <a
+                              key={`${document.url}-${document.uploadedAt}`}
+                              href={document.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:border-blue-200"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              <span className="min-w-0 flex-1 truncate">{document.originalName}</span>
+                              <span className="text-gray-400">{formatDisplayDateTime(document.uploadedAt)}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {vendorListings.map((listing) => (
             <div key={listing.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="relative h-44 overflow-hidden bg-gray-100">
                 <img src={listing.image} alt={listing.title} className="w-full h-full object-cover" />
@@ -367,16 +533,33 @@ function ListingsPage({
                   );
                 })()}
                 <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">{listing.title}</h3>
+                {listing.documentsRequestedAt && !listing.documentsSubmittedAt && (
+                  <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <p className="font-semibold">Documents requested</p>
+                    {listing.requestedDocuments && listing.requestedDocuments.length > 0 && (
+                      <p className="mt-1">{listing.requestedDocuments.join(", ")}</p>
+                    )}
+                    <p className="mt-1">
+                      {listing.documentRequestMessage || listing.verificationNote || "Update this profile to submit documents."}
+                    </p>
+                  </div>
+                )}
+                {listing.documentsSubmittedAt && (
+                  <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                    Documents submitted {formatDisplayDateTime(listing.documentsSubmittedAt)}
+                  </p>
+                )}
                 <p className="mt-2 text-xs text-gray-500">{listing.subCategory} • {listing.city}, {listing.state}</p>
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
                   <span className="text-sm font-semibold text-gray-900">{listing.price}</span>
                   <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={() => onEditListing(listing.id)}>
-                    Edit
+                    {listing.documentsRequestedAt && !listing.documentsSubmittedAt ? "Update Documents" : "Edit"}
                   </Button>
                 </div>
               </div>
             </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

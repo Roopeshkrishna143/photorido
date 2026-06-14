@@ -472,6 +472,17 @@ marketplaceBookingRouter.post(
     }
 
     applyBookingStatus(booking, "approved_by_vendor");
+    if (booking.rescheduledAt && !booking.rescheduleResolvedAt) {
+      booking.rescheduleResolvedAt = new Date();
+      booking.activityHistory = [
+        ...(booking.activityHistory ?? []),
+        {
+          type: "reschedule-approval",
+          note: "Vendor approved the rescheduled booking.",
+          createdAt: new Date(),
+        },
+      ];
+    }
     await booking.save();
     await createUserNotification(booking.userId, "user", buildBookingStatusMessage("approved_by_vendor"), {
       targetPath: NOTIFICATION_TARGET_PATHS.bookings,

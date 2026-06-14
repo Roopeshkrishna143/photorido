@@ -33,7 +33,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { formatDisplayDate } from "../../lib/date";
+import { formatDisplayDate, formatDisplayDateTime } from "../../lib/date";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
@@ -102,6 +102,41 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
     <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusStyles[status]}`}>
       {labelMap[status]}
     </span>
+  );
+}
+
+function BookingCoordinatorActivity({
+  booking,
+}: {
+  booking: {
+    operationsNote?: string;
+    rescheduledAt?: string | null;
+    rescheduleResolvedAt?: string | null;
+    activityHistory?: Array<{ type: string; note: string; createdAt: string }>;
+  };
+}) {
+  const latestActivity = booking.activityHistory?.slice(-2) ?? [];
+
+  if (!booking.operationsNote && !booking.rescheduledAt && latestActivity.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+      {booking.rescheduledAt && !booking.rescheduleResolvedAt && (
+        <p className="font-semibold">
+          Reschedule pending since {formatDisplayDateTime(booking.rescheduledAt)}
+        </p>
+      )}
+      {booking.operationsNote && (
+        <p className="mt-1">Booking Coordinator Update: {booking.operationsNote}</p>
+      )}
+      {latestActivity.map((entry) => (
+        <p key={`${entry.createdAt}-${entry.type}`} className="mt-1 text-blue-700">
+          {formatDisplayDateTime(entry.createdAt)} - {entry.note}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -612,6 +647,7 @@ export function MarketplaceConsumerOverview() {
                         <p className="text-xs text-gray-400 mt-1">
                           {formatDisplayDate(booking.date)} - {booking.time}
                         </p>
+                        <BookingCoordinatorActivity booking={booking} />
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -882,6 +918,7 @@ export function MarketplaceConsumerBookings() {
                       <td className="py-4 px-4">
                         <p className="font-medium text-gray-800">{booking.listingName}</p>
                         <p className="text-xs text-gray-500 mt-1">{booking.time}</p>
+                        <BookingCoordinatorActivity booking={booking} />
                       </td>
                       <td className="py-4 px-4 text-gray-700 whitespace-nowrap">{booking.eventType}</td>
                       <td className="py-4 px-4 text-gray-600 whitespace-nowrap">
@@ -1167,6 +1204,7 @@ export function MarketplaceVendorBookings() {
                       <div>
                         <p className="font-semibold text-gray-900">{booking.listingName}</p>
                         <p className="text-xs text-gray-500 mt-1">{booking.eventType} - {booking.location}</p>
+                        <BookingCoordinatorActivity booking={booking} />
                       </div>
                     </td>
                     <td className="py-4 px-4 text-gray-700">{booking.userName}</td>
@@ -1175,7 +1213,14 @@ export function MarketplaceVendorBookings() {
                     </td>
                     <td className="py-4 px-4 text-gray-600 whitespace-nowrap">{booking.time}</td>
                     <td className="py-4 px-4">
-                      <BookingStatusBadge status={booking.status} />
+                      <div className="space-y-1">
+                        <BookingStatusBadge status={booking.status} />
+                        {booking.rescheduledAt && !booking.rescheduleResolvedAt && booking.status === "pending" && (
+                          <p className="text-xs font-semibold text-amber-700">
+                            Booking Rescheduled - Approval Required
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">{booking.amount}</td>
                     <td className="py-4 px-4">

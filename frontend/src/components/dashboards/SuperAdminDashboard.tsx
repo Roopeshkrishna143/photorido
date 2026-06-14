@@ -35,6 +35,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { SettingsPage } from "./SettingsPage";
+import { SupportDashboard } from "./OperationalDashboard";
 import { Input } from "../ui/input";
 import { api, unwrapPayload } from "../../lib/api";
 import { getServiceCategoryVisual } from "../../lib/public-marketplace";
@@ -2108,6 +2109,14 @@ export function SuperAdminDashboard() {
         return <SubCategoriesPage />;
       case "listings":
         return <ListingsPage />;
+      case "support-activity":
+        return <SupportDashboard readOnly />;
+      case "tickets":
+        return <SupportDashboard view="tickets" readOnly />;
+      case "assigned-tickets":
+        return <SupportDashboard view="assigned-tickets" readOnly />;
+      case "support-escalations":
+        return <SupportDashboard view="support-escalations" readOnly />;
       case "settings":
         return <SettingsPage />;
       case "schedules":

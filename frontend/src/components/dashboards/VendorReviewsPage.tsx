@@ -88,6 +88,15 @@ export function VendorReviewsPage() {
                   {review.comment}
                 </div>
 
+                {review.warnedAt && (
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-amber-800">Account warning</p>
+                    <p className="mt-1 text-sm text-amber-900">
+                      {review.moderationNote || "A moderator issued a warning for this review."}
+                    </p>
+                  </div>
+                )}
+
                 {review.vendorResponse ? (
                   <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
                     <div className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-blue-700">

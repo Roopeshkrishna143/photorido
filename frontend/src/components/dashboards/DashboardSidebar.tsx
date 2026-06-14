@@ -6,6 +6,8 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
+  AlertTriangle,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -15,13 +17,13 @@ import {
   LogOut,
   Megaphone,
   MessageSquare,
-  Scale,
   Settings,
   ShieldCheck,
   Sparkles,
   Star,
   Tags,
   Users,
+  XCircle,
 } from "lucide-react";
 import logoImage from "figma:asset/1a7396ce0df98b8e9d99c9694dadb671a2b68d89.png";
 import { useAuth, UserRole } from "../../context/AuthContext";
@@ -59,6 +61,7 @@ const SUPER_ADMIN_NAV: NavCategory[] = [
       { label: "Sub-Categories", icon: Layers, key: "sub-categories" },
       { label: "User Management", icon: Users, key: "user-management" },
       { label: "User Profiles List", icon: ClipboardCheck, key: "listings" },
+      { label: "Support Activity", icon: MessageSquare, key: "support-activity" },
     ],
   },
 ];
@@ -94,16 +97,72 @@ const USER_NAV: NavCategory[] = [
   },
 ];
 
-const OPERATIONS_NAV: NavCategory[] = [
+const VERIFICATION_NAV: NavCategory[] = [
   {
-    title: "Operations",
+    title: "Verification",
     items: [
       { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
-      { label: "Verification", icon: ShieldCheck, key: "verification" },
-      { label: "Bookings", icon: BookOpen, key: "operations" },
-      { label: "Support", icon: MessageSquare, key: "support" },
-      { label: "Moderation", icon: ClipboardCheck, key: "moderation" },
-      { label: "Finance", icon: Scale, key: "finance" },
+      { label: "Pending Vendors", icon: ShieldCheck, key: "pending-vendors" },
+      { label: "Documents Submitted", icon: ClipboardCheck, key: "submitted-documents" },
+      { label: "Approved Vendors", icon: CheckCircle2, key: "approved-vendors" },
+      { label: "Rejected Vendors", icon: XCircle, key: "rejected-vendors" },
+      { label: "Verification Requests", icon: ClipboardCheck, key: "verification-requests" },
+    ],
+  },
+];
+
+const BOOKING_COORDINATOR_NAV: NavCategory[] = [
+  {
+    title: "Booking Operations",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Active Bookings", icon: BookOpen, key: "active-bookings" },
+      { label: "Reschedules", icon: CalendarDays, key: "reschedules" },
+      { label: "Escalations", icon: AlertTriangle, key: "booking-escalations" },
+    ],
+  },
+];
+
+const SUPPORT_NAV: NavCategory[] = [
+  {
+    title: "Support",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Tickets", icon: MessageSquare, key: "tickets" },
+      { label: "Assigned Tickets", icon: Users, key: "assigned-tickets" },
+      { label: "Escalations", icon: AlertTriangle, key: "support-escalations" },
+    ],
+  },
+];
+
+const MODERATION_NAV: NavCategory[] = [
+  {
+    title: "Moderation",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Reviews", icon: Star, key: "moderation-reviews" },
+      { label: "Media Queue", icon: ClipboardCheck, key: "media-queue" },
+      { label: "Warnings", icon: MessageSquare, key: "warnings" },
+      { label: "Ban Requests", icon: ShieldCheck, key: "ban-requests" },
+    ],
+  },
+];
+
+const FINANCE_NAV: NavCategory[] = [
+  {
+    title: "Finance",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Finance", icon: BarChart2, key: "finance" },
+    ],
+  },
+];
+
+const MARKETING_NAV: NavCategory[] = [
+  {
+    title: "Marketing",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
       { label: "Marketing", icon: Megaphone, key: "marketing" },
     ],
   },
@@ -113,17 +172,13 @@ function getNavForRole(role: UserRole): NavCategory[] {
   if (role === "super-admin") return SUPER_ADMIN_NAV;
   if (role === "admin") return SUPER_ADMIN_NAV;
   if (role === "vendor") return VENDOR_NAV;
-  if (
-    role === "staff" ||
-    role === "vendor_verification_officer" ||
-    role === "booking_coordinator" ||
-    role === "support_executive" ||
-    role === "content_moderator" ||
-    role === "finance_manager" ||
-    role === "marketing_manager"
-  ) {
-    return OPERATIONS_NAV;
-  }
+  if (role === "vendor_verification_officer") return VERIFICATION_NAV;
+  if (role === "booking_coordinator") return BOOKING_COORDINATOR_NAV;
+  if (role === "support_executive") return SUPPORT_NAV;
+  if (role === "content_moderator") return MODERATION_NAV;
+  if (role === "finance_manager") return FINANCE_NAV;
+  if (role === "marketing_manager") return MARKETING_NAV;
+  if (role === "staff") return SUPPORT_NAV;
   return USER_NAV;
 }
 
