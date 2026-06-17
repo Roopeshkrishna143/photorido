@@ -23,6 +23,7 @@ import {
   serializeCategory,
   serializeMarketplaceListing,
   serializeNotification,
+  serializePendingVendorAccount,
   serializePlatformUser,
   serializeSearchAdvertisement,
   serializeSubCategory,
@@ -116,6 +117,24 @@ const documentUploadSchema = z.object({
   size: z.coerce.number().min(0),
   uploadedAt: z.string().trim().optional(),
 });
+
+const removeDocumentUploadSchema = z.object({
+  url: z.string().trim().min(1),
+});
+
+function getUploadUrlPath(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const parsedUrl = new URL(trimmed);
+    return parsedUrl.pathname;
+  } catch {
+    return trimmed;
+  }
+}
 
 const locationResolveSchema = z.object({
   input: z.string().trim().min(1, "Location input is required."),
@@ -674,10 +693,25 @@ marketplaceRouter.get(
         : { status: "approved" };
 
     const listings = await VendorProfileModel.find(query).sort({ createdAt: -1, updatedAt: -1 });
+    const listingPayload = listings.map((listing) => serializeMarketplaceListing(listing));
+
+    if (isOperationalRole) {
+      const profileVendorIds = new Set(listings.map((listing) => listing.vendorId));
+      const vendorsWithoutProfiles = await UserModel.find({
+        role: "vendor",
+        status: { $in: ["active", "invited"] },
+      }).sort({ createdAt: -1 });
+
+      listingPayload.push(
+        ...vendorsWithoutProfiles
+          .filter((vendor) => !profileVendorIds.has(vendor.id))
+          .map((vendor) => serializePendingVendorAccount(vendor)),
+      );
+    }
 
     response.status(200).json({
       success: true,
-      data: listings.map((listing) => serializeMarketplaceListing(listing)),
+      data: listingPayload,
     });
   }),
 );
@@ -878,6 +912,54 @@ marketplaceRouter.post(
     response.status(200).json({
       success: true,
       message: "Documents attached successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/listings/:listingId/document-uploads",
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = removeDocumentUploadSchema.parse(request.body);
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    if (listing.vendorId !== authUser.id) {
+      throw new HttpError(403, "You can only remove documents for your own profiles.");
+    }
+
+    if (!listing.documentsRequestedAt) {
+      throw new HttpError(400, "This profile does not have an open document request.");
+    }
+
+    if (listing.documentsSubmittedAt) {
+      throw new HttpError(400, "Submitted documents can no longer be removed.");
+    }
+
+    const targetPath = getUploadUrlPath(input.url);
+    const originalCount = listing.documentUploads?.length ?? 0;
+    listing.documentUploads = (listing.documentUploads ?? []).filter((document) => {
+      return document.url !== input.url && getUploadUrlPath(document.url) !== targetPath;
+    });
+
+    if ((listing.documentUploads?.length ?? 0) === originalCount) {
+      throw new HttpError(404, "Uploaded document not found.");
+    }
+
+    listing.verificationStatusChangedAt = new Date();
+    await listing.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Document removed successfully.",
       data: serializeMarketplaceListing(listing),
     });
   }),

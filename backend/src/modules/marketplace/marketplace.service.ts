@@ -234,6 +234,53 @@ export function serializeMarketplaceListing(profile: VendorProfileDocument) {
   };
 }
 
+export function serializePendingVendorAccount(user: UserDocument) {
+  const createdAt = toIsoString(user.createdAt);
+
+  return {
+    id: `vendor-account-${user.id}`,
+    vendorId: user.id,
+    vendorName: user.name,
+    vendorEmail: user.email,
+    title: user.name,
+    categoryId: "",
+    category: "Profile Not Submitted",
+    subCategoryId: "",
+    subCategory: "",
+    city: "",
+    state: "",
+    district: "",
+    area: "",
+    address: "",
+    colony: "",
+    pincode: "",
+    price: "",
+    image: "",
+    featuredImageCrop: null,
+    description: "",
+    experience: "",
+    locationInput: user.location || "",
+    placeId: "",
+    coordinates: undefined,
+    portfolio: [],
+    albums: [],
+    youtubeLinks: [],
+    status: "pending" as const,
+    verificationNote: "Profile Not Submitted",
+    requestedDocuments: [],
+    documentRequestMessage: "",
+    documentUploads: [],
+    documentsRequestedAt: null,
+    documentsSubmittedAt: null,
+    verificationStatusChangedAt: null,
+    mediaModerationNote: "",
+    mediaWarnedAt: null,
+    mediaBanEscalatedAt: null,
+    createdAt,
+    updatedAt: user.updatedAt ? toIsoString(user.updatedAt) : createdAt,
+  };
+}
+
 export function serializeBooking(booking: MarketplaceBookingDocument) {
   return {
     id: booking.id,

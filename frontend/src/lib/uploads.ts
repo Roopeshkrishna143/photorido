@@ -42,5 +42,6 @@ export async function uploadDocumentFile(file: File) {
 
   return {
     ...data,
+    url: resolvePublicAssetUrl(data.url),
   };
 }

@@ -94,6 +94,13 @@ interface SupportTicket {
   issueTitle: string;
   description: string;
   status: SupportTicketStatus;
+  resolutionNote?: string;
+  activityHistory?: Array<{
+    type: string;
+    note: string;
+    createdAt: string;
+    createdByName?: string;
+  }>;
   escalatedAt?: string | null;
   resolvedAt?: string | null;
   closedAt?: string | null;
@@ -353,7 +360,10 @@ function VerificationDashboard({
     }
   };
 
-  const renderListing = (listing: MarketplaceListing) => (
+  const renderListing = (listing: MarketplaceListing) => {
+    const profileNotSubmitted = listing.id.startsWith("vendor-account-");
+
+    return (
     <div
       key={listing.id}
       className="rounded-2xl border border-gray-100 bg-white p-4"
@@ -362,10 +372,15 @@ function VerificationDashboard({
         <div>
           <p className="font-semibold text-gray-900">{listing.title}</p>
           <p className="mt-1 text-sm text-gray-500">
-            {listing.vendorName} - {listing.city}, {listing.state}
+            {listing.vendorName}
+            {[listing.city, listing.state].filter(Boolean).length > 0
+              ? ` - ${[listing.city, listing.state].filter(Boolean).join(", ")}`
+              : ""}
           </p>
           <p className="mt-1 text-xs text-gray-400">
-            {listing.category} / {listing.subCategory}
+            {profileNotSubmitted
+              ? "Status: Profile Not Submitted"
+              : `${listing.category} / ${listing.subCategory}`}
           </p>
           {listing.documentsRequestedAt && (
             <p className="mt-2 text-xs font-semibold text-amber-600">
@@ -390,7 +405,7 @@ function VerificationDashboard({
             </p>
           )}
         </div>
-        <StatusBadge status={listing.status} />
+        <StatusBadge status={profileNotSubmitted ? "Profile Not Submitted" : listing.status} />
       </div>
       {listing.documentUploads && listing.documentUploads.length > 0 && (
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
@@ -412,7 +427,8 @@ function VerificationDashboard({
           </div>
         </div>
       )}
-      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
+      {!profileNotSubmitted && (
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(180px,1fr)_auto_auto_auto]">
         <Input
           value={noteById[listing.id] ?? ""}
           onChange={(event) =>
@@ -452,8 +468,10 @@ function VerificationDashboard({
           <FileWarning className="h-4 w-4" /> Request Docs
         </Button>
       </div>
+      )}
     </div>
-  );
+    );
+  };
 
   // ── Focused views ──────────────────────────────────────────────────────────
   const requestDocumentsDialog = (
@@ -826,7 +844,7 @@ function BookingCoordinatorDashboard({
             <Button
               size="sm"
               variant="outline"
-              className="rounded-xl"
+              className="w-full rounded-xl xl:w-auto"
               onClick={() => void patchBooking(booking, { cancelReschedule: true })}
             >
               Cancel Reschedule
@@ -985,6 +1003,7 @@ export function SupportDashboard({
     issueTitle: "",
     description: "",
   });
+  const [supportNoteById, setSupportNoteById] = useState<Record<string, string>>({});
 
   const loadTickets = useCallback(async () => {
     try {
@@ -1009,6 +1028,7 @@ export function SupportDashboard({
   const patchTicket = async (
     ticket: SupportTicket,
     input: Partial<SupportTicket> & {
+      note?: string;
       escalate?: boolean;
       deescalate?: boolean;
       reopen?: boolean;
@@ -1021,15 +1041,18 @@ export function SupportDashboard({
     await loadTickets();
   };
 
-  const renderTicket = (ticket: SupportTicket) => (
+  const renderTicket = (
+    ticket: SupportTicket,
+    actionMode: "full" | "escalationFull" | "none" | "reopenOnly" = "full",
+  ) => (
     <div
       key={ticket.id}
       className="rounded-2xl border border-gray-100 bg-white p-4"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="font-semibold text-gray-900">{ticket.issueTitle}</p>
-          <p className="mt-1 text-sm text-gray-600">{ticket.description}</p>
+          <p className="mt-1 break-words text-sm text-gray-600">{ticket.description}</p>
           <p className="mt-1 text-xs text-gray-400">
             Linked: {ticket.linkedUserName || "Unlinked"} / Assigned:{" "}
             {ticket.assignedToName || "Unassigned"}
@@ -1039,25 +1062,57 @@ export function SupportDashboard({
               Escalated {formatDisplayDateTime(ticket.escalatedAt)}
             </p>
           )}
+          {ticket.resolutionNote && (
+            <p className="mt-2 break-words text-sm text-gray-600">
+              Resolution Note: {ticket.resolutionNote}
+            </p>
+          )}
+          {ticket.activityHistory && ticket.activityHistory.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {ticket.activityHistory.slice(-3).map((entry) => (
+                <p key={`${entry.createdAt}-${entry.type}`} className="break-words text-xs text-gray-500">
+                  {formatDisplayDateTime(entry.createdAt)} - {entry.note}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
         <StatusBadge status={ticket.status} />
       </div>
-      {!readOnly && (
-        <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-[minmax(180px,1fr)_auto_auto_auto_auto_auto]">
-          <select
-            className={FIELD_CLASS}
-            value={ticket.assignedToUserId || ""}
-            onChange={(event) => void patchTicket(ticket, { assignedToUserId: event.target.value })}
-          >
-            <option value="">Assign ticket</option>
-            {platformUsers
-              .filter((user) => user.role !== "user" && user.role !== "vendor")
-              .map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} / {user.role}
-                </option>
-              ))}
-          </select>
+      {!readOnly && actionMode !== "none" && (
+        <div className={actionMode === "full" || actionMode === "escalationFull"
+          ? "mt-4 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(180px,1fr)_minmax(220px,1.2fr)_auto_auto_auto_auto_auto]"
+          : "mt-4 flex justify-end"
+        }>
+          {(actionMode === "full" || actionMode === "escalationFull") && (
+            <>
+              <select
+                className={FIELD_CLASS}
+                value={ticket.assignedToUserId || ""}
+                onChange={(event) => void patchTicket(ticket, { assignedToUserId: event.target.value })}
+              >
+                <option value="">Assign ticket</option>
+                {platformUsers
+                  .filter((user) => user.role !== "user" && user.role !== "vendor")
+                  .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} / {user.role}
+                    </option>
+                  ))}
+              </select>
+              <Input
+                value={supportNoteById[ticket.id] ?? ""}
+                onChange={(event) =>
+                  setSupportNoteById((current) => ({
+                    ...current,
+                    [ticket.id]: event.target.value,
+                  }))
+                }
+                placeholder="Resolution note"
+                className="rounded-xl border-gray-200"
+              />
+            </>
+          )}
           {(ticket.status === "resolved" || ticket.status === "closed") && (
             <Button
               size="sm"
@@ -1068,49 +1123,49 @@ export function SupportDashboard({
               Reopen
             </Button>
           )}
-          {ticket.status !== "resolved" && ticket.status !== "closed" && (
+          {(actionMode === "full" || actionMode === "escalationFull") && ticket.status !== "resolved" && ticket.status !== "closed" && (
             <>
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-xl"
+                className="w-full rounded-xl xl:w-auto"
                 onClick={() => void patchTicket(ticket, { status: "in-progress" })}
               >
                 In Progress
               </Button>
               <Button
                 size="sm"
-                className="bg-green-600 text-white hover:bg-green-700"
-                onClick={() => void patchTicket(ticket, { status: "resolved" })}
+                className="w-full bg-green-600 text-white hover:bg-green-700 xl:w-auto"
+                onClick={() => void patchTicket(ticket, { status: "resolved", note: supportNoteById[ticket.id] })}
               >
-                Resolve
+                {actionMode === "escalationFull" ? "Resolve Escalation" : "Resolve"}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-xl"
+                className="w-full rounded-xl xl:w-auto"
                 onClick={() => void patchTicket(ticket, { close: true })}
               >
                 Close
               </Button>
             </>
           )}
-          {!ticket.escalatedAt && ticket.status !== "resolved" && ticket.status !== "closed" && (
+          {(actionMode === "full" || actionMode === "escalationFull") && !ticket.escalatedAt && ticket.status !== "resolved" && ticket.status !== "closed" && (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1 rounded-xl text-amber-700"
-              onClick={() => void patchTicket(ticket, { escalate: true })}
+              className="w-full gap-1 rounded-xl text-amber-700 xl:w-auto"
+              onClick={() => void patchTicket(ticket, { escalate: true, note: supportNoteById[ticket.id] })}
             >
               <AlertTriangle className="h-4 w-4" /> Escalate
             </Button>
           )}
-          {ticket.escalatedAt && ticket.status !== "resolved" && ticket.status !== "closed" && (
+          {(actionMode === "full" || actionMode === "escalationFull") && ticket.escalatedAt && ticket.status !== "resolved" && ticket.status !== "closed" && (
             <Button
               size="sm"
               variant="outline"
-              className="rounded-xl"
-              onClick={() => void patchTicket(ticket, { deescalate: true })}
+              className="w-full rounded-xl xl:w-auto"
+              onClick={() => void patchTicket(ticket, { deescalate: true, note: supportNoteById[ticket.id] })}
             >
               De-escalate
             </Button>
@@ -1197,30 +1252,23 @@ export function SupportDashboard({
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Section title="Open Tickets">
             {grouped.open.length ? (
-              grouped.open.map(renderTicket)
+              grouped.open.map((ticket) => renderTicket(ticket, "none"))
             ) : (
               <EmptyState text="No open tickets." />
             )}
           </Section>
-          <Section title="In Progress">
-            {grouped.progress.length ? (
-              grouped.progress.map(renderTicket)
+          <Section title="Escalated Tickets">
+            {grouped.escalated.length ? (
+              grouped.escalated.map((ticket) => renderTicket(ticket, "none"))
             ) : (
-              <EmptyState text="No tickets in progress." />
+              <EmptyState text="No escalated tickets." />
             )}
           </Section>
-          <Section title="Resolved Tickets">
-            {grouped.resolved.length ? (
-              grouped.resolved.map(renderTicket)
+          <Section title="Closed / Resolved Tickets">
+            {grouped.closed.length || grouped.resolved.length ? (
+              [...grouped.resolved, ...grouped.closed].map((ticket) => renderTicket(ticket, "reopenOnly"))
             ) : (
-              <EmptyState text="No resolved tickets." />
-            )}
-          </Section>
-          <Section title="Closed Tickets">
-            {grouped.closed.length ? (
-              grouped.closed.map(renderTicket)
-            ) : (
-              <EmptyState text="No closed tickets." />
+              <EmptyState text="No closed or resolved tickets." />
             )}
           </Section>
         </div>
@@ -1235,7 +1283,7 @@ export function SupportDashboard({
         {errorBanner}
         <Section title="Assigned Tickets">
           {grouped.assigned.length ? (
-            grouped.assigned.map(renderTicket)
+            grouped.assigned.map((ticket) => renderTicket(ticket, "full"))
           ) : (
             <EmptyState text="No assigned tickets." />
           )}
@@ -1251,7 +1299,7 @@ export function SupportDashboard({
         {errorBanner}
         <Section title="Escalated Tickets">
           {grouped.escalated.length ? (
-            grouped.escalated.map(renderTicket)
+            grouped.escalated.map((ticket) => renderTicket(ticket, "escalationFull"))
           ) : (
             <EmptyState text="No escalated tickets." />
           )}

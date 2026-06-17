@@ -20,7 +20,7 @@ const operationsRouter = Router();
 
 const vendorStatusSchema = z.object({
   status: z.enum(VENDOR_PROFILE_STATUSES),
-  note: z.string().trim().max(1000).optional().default(""),
+  note: z.string().trim().max(1000).optional(),
   requestedDocuments: z.array(z.string().trim().min(1).max(120)).max(12).optional().default([]),
   documentRequestMessage: z.string().trim().max(1000).optional().default(""),
   requestDocuments: z.boolean().optional().default(false),
@@ -64,6 +64,7 @@ const ticketUpdateSchema = z.object({
   description: z.string().trim().min(3).max(2000).optional(),
   status: z.enum(SUPPORT_TICKET_STATUSES).optional(),
   assignedToUserId: z.string().trim().optional(),
+  note: z.string().trim().max(1000).optional().default(""),
   escalate: z.boolean().optional(),
   deescalate: z.boolean().optional(),
   reopen: z.boolean().optional(),
@@ -119,6 +120,13 @@ function serializeTicket(ticket: SupportTicketDocument) {
     issueTitle: ticket.issueTitle,
     description: ticket.description,
     status: ticket.status,
+    resolutionNote: ticket.resolutionNote ?? "",
+    activityHistory: (ticket.activityHistory ?? []).map((entry) => ({
+      type: entry.type,
+      note: entry.note,
+      createdAt: entry.createdAt.toISOString(),
+      createdByName: entry.createdByName ?? "",
+    })),
     escalatedAt: ticket.escalatedAt ? ticket.escalatedAt.toISOString() : null,
     resolvedAt: ticket.resolvedAt ? ticket.resolvedAt.toISOString() : null,
     closedAt: ticket.closedAt ? ticket.closedAt.toISOString() : null,
@@ -257,9 +265,21 @@ operationsRouter.post(
 
 operationsRouter.patch(
   "/support-tickets/:ticketId",
-  authorizePermissions("update_support_status", "escalate_support_issue"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const authUser = ensureAuthUser(request);
+    if (authUser.role !== "super-admin") {
+      await new Promise<void>((resolve, reject) => {
+        authorizePermissions("update_support_status", "escalate_support_issue")(
+          request,
+          response,
+          (error?: unknown) => {
+            if (error) reject(error);
+            else resolve();
+          },
+        );
+      });
+    }
+
     const input = ticketUpdateSchema.parse(request.body);
     const ticket = await SupportTicketModel.findById(request.params.ticketId);
     if (!ticket) {
@@ -295,6 +315,7 @@ operationsRouter.patch(
       if (input.status === "resolved") {
         ticket.resolvedAt = new Date();
         ticket.escalatedAt = null;
+        ticket.resolutionNote = input.note || ticket.resolutionNote || "Ticket resolved.";
       }
       if (input.status === "closed") {
         ticket.closedAt = new Date();
@@ -306,8 +327,10 @@ operationsRouter.patch(
     }
     if (input.escalate) ticket.escalatedAt = new Date();
     if (input.deescalate) ticket.escalatedAt = null;
+    if (input.note) {
+      ticket.resolutionNote = input.note;
+    }
     ticket.updatedByUserId = authUser.id;
-    await ticket.save();
 
     const updates: string[] = [`status is ${ticket.status}`];
     if (input.assignedToUserId !== undefined) updates.push(`assigned to ${ticket.assignedToName || authUser.name}`);
@@ -315,6 +338,29 @@ operationsRouter.patch(
     if (input.deescalate) updates.push("de-escalated");
     if (input.reopen) updates.push("reopened");
     if (input.close) updates.push("closed");
+    if (input.note) updates.push("note added");
+
+    ticket.activityHistory = [
+      ...(ticket.activityHistory ?? []),
+      {
+        type: input.escalate
+          ? "escalation"
+          : input.deescalate
+            ? "de-escalation"
+            : input.status === "resolved"
+              ? "resolution"
+              : input.close
+                ? "closed"
+                : input.reopen
+                  ? "reopened"
+                  : "update",
+        note: input.note || `Support ticket ${updates.join(", ")}.`,
+        createdAt: new Date(),
+        createdByUserId: authUser.id,
+        createdByName: authUser.name,
+      },
+    ];
+    await ticket.save();
 
     await Promise.all([
       notifyLinkedUser(ticket, `Support ticket updated: ${ticket.issueTitle} ${updates.join(", ")}.`),

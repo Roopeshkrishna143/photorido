@@ -346,6 +346,7 @@ function ListingsPage({
   const vendorListings = listings;
   const [submittingDocumentId, setSubmittingDocumentId] = useState<string | null>(null);
   const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
+  const [removingDocumentKey, setRemovingDocumentKey] = useState<string | null>(null);
   const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
   const documentRequests = vendorListings.filter(
     (listing) => listing.documentsRequestedAt && !listing.documentsSubmittedAt,
@@ -375,6 +376,19 @@ function ListingsPage({
       await refreshMarketplace();
     } finally {
       setSubmittingDocumentId(null);
+    }
+  };
+
+  const removeRequestedDocument = async (listingId: string, documentUrl: string) => {
+    const removeKey = `${listingId}-${documentUrl}`;
+    setRemovingDocumentKey(removeKey);
+    try {
+      await api.delete(`/marketplace/listings/${listingId}/document-uploads`, {
+        body: { url: documentUrl },
+      });
+      await refreshMarketplace();
+    } finally {
+      setRemovingDocumentKey(null);
     }
   };
 
@@ -471,17 +485,31 @@ function ListingsPage({
                         <p className="text-xs font-semibold text-gray-600">Attached files</p>
                         <div className="mt-2 grid gap-2 sm:grid-cols-2">
                           {listing.documentUploads.map((document) => (
-                            <a
+                            <div
                               key={`${document.url}-${document.uploadedAt}`}
-                              href={document.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:border-blue-200"
+                              className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs font-medium text-blue-700"
                             >
-                              <FileText className="h-3.5 w-3.5" />
-                              <span className="min-w-0 flex-1 truncate">{document.originalName}</span>
+                              <a
+                                href={document.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex min-w-0 flex-1 items-center gap-2 hover:text-blue-800"
+                              >
+                                <FileText className="h-3.5 w-3.5 shrink-0" />
+                                <span className="min-w-0 flex-1 truncate">{document.originalName}</span>
+                              </a>
                               <span className="text-gray-400">{formatDisplayDateTime(document.uploadedAt)}</span>
-                            </a>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 shrink-0 gap-1 rounded-lg px-2 text-red-600 hover:text-red-700"
+                                disabled={removingDocumentKey === `${listing.id}-${document.url}`}
+                                onClick={() => void removeRequestedDocument(listing.id, document.url)}
+                              >
+                                <XCircle className="h-3 w-3" /> Remove
+                              </Button>
+                            </div>
                           ))}
                         </div>
                       </div>

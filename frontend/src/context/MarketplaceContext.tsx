@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { api, getErrorMessage, getStoredAuthToken, unwrapArray, unwrapPayload } from "../lib/api";
+import { resolvePublicAssetUrl } from "../lib/media";
 
 export type ManagedUserRole =
   | "super-admin"
@@ -538,6 +539,22 @@ async function fetchCollection<T>(path: string) {
   return unwrapArray<T>(payload);
 }
 
+function normalizeListingAssetUrls(listing: MarketplaceListing): MarketplaceListing {
+  return {
+    ...listing,
+    image: resolvePublicAssetUrl(listing.image),
+    portfolio: (listing.portfolio ?? []).map((url) => resolvePublicAssetUrl(url)),
+    albums: (listing.albums ?? []).map((album) => ({
+      ...album,
+      images: album.images.map((url) => resolvePublicAssetUrl(url)),
+    })),
+    documentUploads: (listing.documentUploads ?? []).map((document) => ({
+      ...document,
+      url: resolvePublicAssetUrl(document.url),
+    })),
+  };
+}
+
 function getSocketUrl() {
   const configuredBase = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
@@ -581,7 +598,9 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
 
           if (result.status === "fulfilled") {
             const [, items] = result.value;
-            nextSnapshot[resourceKey] = items as never;
+            nextSnapshot[resourceKey] = (resourceKey === "listings"
+              ? (items as MarketplaceListing[]).map(normalizeListingAssetUrls)
+              : items) as never;
             return;
           }
 

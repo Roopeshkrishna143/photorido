@@ -15,6 +15,14 @@ export interface SupportTicketRecord {
   escalatedAt?: Date | null;
   closedAt?: Date | null;
   resolvedAt?: Date | null;
+  resolutionNote?: string;
+  activityHistory?: Array<{
+    type: string;
+    note: string;
+    createdAt: Date;
+    createdByUserId?: string;
+    createdByName?: string;
+  }>;
   createdByUserId?: string;
   updatedByUserId?: string;
   createdAt: Date;
@@ -59,6 +67,23 @@ const supportTicketSchema = new Schema<SupportTicketRecord>(
     resolvedAt: {
       type: Date,
       default: null,
+    },
+    resolutionNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    activityHistory: {
+      type: [
+        {
+          type: { type: String, required: true, trim: true },
+          note: { type: String, required: true, trim: true },
+          createdAt: { type: Date, default: Date.now },
+          createdByUserId: { type: String, trim: true },
+          createdByName: { type: String, trim: true },
+        },
+      ],
+      default: [],
     },
     createdByUserId: {
       type: String,

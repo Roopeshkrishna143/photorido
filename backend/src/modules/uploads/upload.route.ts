@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { Router } from "express";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/async-handler.js";
@@ -17,7 +18,7 @@ const allowedDocumentTypes = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 const maxSizeBytes = 8 * 1024 * 1024;
-const uploadRoot = path.resolve(process.cwd(), "uploads");
+const uploadRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..", "uploads");
 const imagesRoot = path.join(uploadRoot, "images");
 const documentsRoot = path.join(uploadRoot, "documents");
 

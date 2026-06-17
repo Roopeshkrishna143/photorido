@@ -2116,7 +2116,7 @@ export function SuperAdminDashboard() {
       case "assigned-tickets":
         return <SupportDashboard view="assigned-tickets" readOnly />;
       case "support-escalations":
-        return <SupportDashboard view="support-escalations" readOnly />;
+        return <SupportDashboard view="support-escalations" />;
       case "settings":
         return <SettingsPage />;
       case "schedules":

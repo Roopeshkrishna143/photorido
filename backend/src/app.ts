@@ -26,7 +26,15 @@ export function createApp() {
   app.use(cookieParser());
   app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: env.JSON_BODY_LIMIT }));
-  app.use("/uploads", express.static(path.resolve(uploadRoot)));
+  app.use(
+    "/uploads",
+    express.static(path.resolve(uploadRoot), {
+      setHeaders(response) {
+        response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+      },
+    }),
+  );
 
   app.get("/", (_request, response) => {
     response.status(200).json({

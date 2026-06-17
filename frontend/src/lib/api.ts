@@ -44,6 +44,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isBodyInit(value: unknown): value is BodyInit {
+  return (
+    typeof value === "string" ||
+    value instanceof Blob ||
+    value instanceof ArrayBuffer ||
+    value instanceof FormData ||
+    value instanceof URLSearchParams ||
+    ArrayBuffer.isView(value)
+  );
+}
+
 function getResponseMessage(payload: unknown, fallback: string) {
   if (typeof payload === "string" && payload.trim() !== "") {
     return payload;
@@ -191,9 +202,9 @@ async function performRequest(path: string, options: RequestOptions = {}) {
   const { body, headers, query, skipAuthToken, ...rest } = options;
   const token = getStoredAuthToken();
   const finalHeaders = new Headers(headers ?? {});
-  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const shouldSendBodyDirectly = isBodyInit(body);
 
-  if (!isFormData && body && !finalHeaders.has("Content-Type")) {
+  if (!shouldSendBodyDirectly && body && !finalHeaders.has("Content-Type")) {
     finalHeaders.set("Content-Type", "application/json");
   }
 
@@ -205,7 +216,7 @@ async function performRequest(path: string, options: RequestOptions = {}) {
     credentials: "include",
     ...rest,
     headers: finalHeaders,
-    body: isFormData || body === undefined || body === null
+    body: shouldSendBodyDirectly || body === undefined || body === null
       ? (body as BodyInit | null | undefined)
       : JSON.stringify(body),
   });
