@@ -12,5 +12,11 @@
     "check:backend": "npm --prefix backend run check",
     "test:backend": "npm --prefix backend run test",
     "ci": "npm run build:frontend && npm run build:admin && npm run build:backend && npm run test:backend"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.0.0"
   }
 }
