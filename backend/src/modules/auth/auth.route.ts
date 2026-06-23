@@ -118,7 +118,7 @@ const googleAuthSchema = z.object({
 function clearCookieOptions() {
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: env.NODE_ENV === "production" ? "none" as const : "lax" as const,
     secure: env.NODE_ENV === "production",
     path: "/",
   };

@@ -793,7 +793,7 @@ export async function refreshSession(refreshToken: string, request?: Pick<Reques
 export function buildAuthCookieOptions(): CookieOptions {
   return {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     secure: env.NODE_ENV === "production",
     path: "/",
     maxAge: env.ACCESS_TOKEN_TTL_HOURS * 60 * 60 * 1000,
@@ -803,7 +803,7 @@ export function buildAuthCookieOptions(): CookieOptions {
 export function buildRefreshCookieOptions(): CookieOptions {
   return {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     secure: env.NODE_ENV === "production",
     path: "/",
     maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,

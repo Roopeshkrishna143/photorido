@@ -11,7 +11,7 @@ React + Vite frontend for the Photorido marketplace experience.
 ## Scripts
 
 - `npm run dev` - start the Vite development server on port `3000`
-- `npm run build` - create a production build in `build/`
+- `npm run build` - create a production build in `dist/`
 - `npm run preview` - preview the production build locally
 
 ## Environment Variables

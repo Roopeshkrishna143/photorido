@@ -17,7 +17,7 @@ export function createApp() {
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(
     cors({
-      origin: env.FRONTEND_URL,
+      origin: env.CORS_ORIGINS,
       credentials: true,
       methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-File-Name"],

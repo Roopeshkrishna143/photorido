@@ -57,7 +57,11 @@ function calculateDistanceKm(
   return Number((earthRadiusKm * centralAngle).toFixed(1));
 }
 
-function hasValidCoordinates(coordinates: { lat: number; lng: number }) {
+function hasValidCoordinates(coordinates?: { lat: number; lng: number } | null): coordinates is { lat: number; lng: number } {
+  if (!coordinates) {
+    return false;
+  }
+
   return Number.isFinite(coordinates.lat)
     && Number.isFinite(coordinates.lng)
     && (coordinates.lat !== 0 || coordinates.lng !== 0);

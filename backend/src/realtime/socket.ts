@@ -24,7 +24,7 @@ function extractSocketToken(socket: Socket) {
 export function attachRealtimeServer(server: HttpServer) {
   io = new Server(server, {
     cors: {
-      origin: env.FRONTEND_URL,
+      origin: env.CORS_ORIGINS,
       credentials: true,
     },
     path: "/socket.io",

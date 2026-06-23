@@ -36,6 +36,7 @@ const envSchema = z.object({
   API_PREFIX: z.string().min(1).default("/api"),
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required."),
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
+  CORS_ORIGINS: optionalTrimmedString,
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters long."),
   JWT_REFRESH_SECRET: optionalSecretString,
   AUTH_COOKIE_NAME: z.string().min(1).default("photorido_auth_token"),
@@ -69,8 +70,14 @@ if (!parsedEnv.success) {
 }
 
 export const env = parsedEnv.data;
+const corsOrigins = [
+  env.FRONTEND_URL,
+  ...(env.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
+].filter((origin, index, origins) => origins.indexOf(origin) === index);
+
 export const resolvedEnv = {
   ...env,
+  CORS_ORIGINS: corsOrigins,
   JWT_REFRESH_SECRET: env.JWT_REFRESH_SECRET ?? env.JWT_ACCESS_SECRET,
 };
 
