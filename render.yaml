@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: photorido-backend
+    runtime: node
+    plan: starter
+    branch: UAT
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: photorido-uploads
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: /api
+      - key: JSON_BODY_LIMIT
+        value: 20mb
+      - key: AUTH_COOKIE_NAME
+        value: photorido_auth_token
+      - key: REFRESH_COOKIE_NAME
+        value: photorido_refresh_token
+      - key: ACCESS_TOKEN_TTL_HOURS
+        value: 24
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: BCRYPT_SALT_ROUNDS
+        value: 12
+      - key: OTP_TTL_MINUTES
+        value: 10
+      - key: OTP_RESEND_COOLDOWN_SECONDS
+        value: 60
+      - key: OTP_MAX_ATTEMPTS
+        value: 5
+      - key: ALLOW_PUBLIC_REGISTRATION
+        value: true
+      - key: MAILTRAP_API_URL
+        value: https://send.api.mailtrap.io/api/send
+      - key: MAILTRAP_SENDER_NAME
+        value: Photorido
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: MAILTRAP_API_TOKEN
+        sync: false
+      - key: MAILTRAP_SENDER_EMAIL
+        sync: false
+      - key: OTP_MOBILE_TEST_RECIPIENT_EMAIL
+        sync: false

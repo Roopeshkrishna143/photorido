@@ -74,12 +74,14 @@ GitHub branch protection cannot be fully enforced from source files alone, so en
 
 ## Deployment Flow
 
-- Push to `develop` runs `CI` and the staging deploy placeholder workflow
-- Push to `main` runs the production deploy placeholder workflow
-- Replace the placeholder deploy steps in `.github/workflows/` with your hosting commands when infrastructure is ready
+- The current UAT deployment target is branch `UAT`
+- Backend deployment config is in `render.yaml`
+- Frontend deployment config is in `frontend/vercel.json`
+- See `docs/deployment.md` for the full Render, Vercel, and MongoDB Atlas setup
 
 ## Documentation
 
 - See `docs/architecture.md` for the system design overview
 - See `docs/api.md` for the backend API structure
+- See `docs/deployment.md` for the deployment guide
 - See `docs/PROJECT_HANDOFF_PROMPT.md` for the preserved handoff context from the earlier project state
