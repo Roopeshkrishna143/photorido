@@ -9,9 +9,11 @@ import {
   ShieldCheck,
   Sparkles,
   UserCircle2,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { showErrorAlert, showSuccessAlert } from "../../lib/alerts";
+import { api, getErrorMessage } from "../../lib/api";
 import { resolvePublicAssetUrl } from "../../lib/media";
 import { uploadImageFile } from "../../lib/uploads";
 import { useSettings, type UserSettings } from "../../hooks/useSettings";
@@ -26,6 +28,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
 
 type CropState = {
   zoom: number;
@@ -313,6 +316,11 @@ export function SettingsPage() {
   const [avatarDraft, setAvatarDraft] = useState<AvatarDraft | null>(null);
   const [avatarCrop, setAvatarCrop] = useState<CropState>(DEFAULT_AVATAR_CROP);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
+  const [supportForm, setSupportForm] = useState({
+    issueTitle: "",
+    description: "",
+  });
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
 
   useEffect(() => {
     const normalizedEmail = user?.email ?? "";
@@ -512,6 +520,36 @@ export function SettingsPage() {
     }
   };
 
+  const handleSupportTicketCreate = async () => {
+    const issueTitle = supportForm.issueTitle.trim();
+    const description = supportForm.description.trim();
+
+    if (issueTitle.length < 2 || description.length < 3) {
+      await showErrorAlert("Ticket not created", {
+        text: "Add a short title and a little detail before submitting.",
+      });
+      return;
+    }
+
+    setIsCreatingTicket(true);
+    try {
+      await api.post("/operations/support-tickets", {
+        issueTitle,
+        description,
+      });
+      setSupportForm({ issueTitle: "", description: "" });
+      await showSuccessAlert("Support ticket created", {
+        text: "The support team can now see this in their ticket queue.",
+      });
+    } catch (error) {
+      await showErrorAlert("Ticket not created", {
+        text: getErrorMessage(error, "We could not create your support ticket right now."),
+      });
+    } finally {
+      setIsCreatingTicket(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -659,6 +697,49 @@ export function SettingsPage() {
           </div>
         </div>
       </Card>
+
+      {(user?.role === "user" || user?.role === "vendor") && (
+        <Card className="border border-gray-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Create Support Ticket</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Input
+              value={supportForm.issueTitle}
+              onChange={(event) =>
+                setSupportForm((current) => ({
+                  ...current,
+                  issueTitle: event.target.value,
+                }))
+              }
+              className="rounded-xl border-gray-200"
+              placeholder="Issue title"
+            />
+            <Textarea
+              value={supportForm.description}
+              onChange={(event) =>
+                setSupportForm((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
+              placeholder="Describe what you need help with"
+              rows={4}
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                className="gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                disabled={isCreatingTicket}
+                onClick={() => void handleSupportTicketCreate()}
+              >
+                {isCreatingTicket ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                Create Ticket
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
         <Card className="border border-gray-100 shadow-sm">

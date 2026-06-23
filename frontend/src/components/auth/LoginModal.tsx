@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
 import { Loader2, Lock, Mail, Smartphone, User } from "lucide-react";
-import { useAuth, type RegistrationOtpResponse, type UserRole } from "../../context/AuthContext";
+import {
+  useAuth,
+  type RegistrationOtpResponse,
+  type UserRole,
+} from "../../context/AuthContext";
 import { showErrorAlert, showSuccessAlert } from "../../lib/alerts";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { Input } from "../ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "../ui/input-otp";
 import { Label } from "../ui/label";
@@ -25,10 +35,11 @@ interface AuthNotice {
   message: string;
 }
 
-const REGISTER_ROLES: Array<{ label: string; value: Exclude<UserRole, null> }> = [
-  { label: "User", value: "user" },
-  { label: "Professional", value: "vendor" },
-];
+const REGISTER_ROLES: Array<{ label: string; value: Exclude<UserRole, null> }> =
+  [
+    { label: "User", value: "user" },
+    { label: "Professional", value: "vendor" },
+  ];
 
 const OTP_LENGTH = 6;
 
@@ -36,11 +47,23 @@ function resolveRegisterRole(role: UserRole) {
   return role === "vendor" ? "vendor" : "user";
 }
 
-export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: LoginModalProps) {
-  const { login, loginWithGoogle, requestRegistrationOtp, verifyRegistrationOtp } = useAuth();
+export function LoginModal({
+  open,
+  onClose,
+  defaultRole = "user",
+  onSuccess,
+}: LoginModalProps) {
+  const {
+    login,
+    loginWithGoogle,
+    requestRegistrationOtp,
+    verifyRegistrationOtp,
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const [registerRole, setRegisterRole] = useState<Exclude<UserRole, null>>(resolveRegisterRole(defaultRole));
+  const [registerRole, setRegisterRole] = useState<Exclude<UserRole, null>>(
+    resolveRegisterRole(defaultRole),
+  );
   const [notice, setNotice] = useState<AuthNotice | null>(null);
 
   const [loginIdentifier, setLoginIdentifier] = useState("");
@@ -51,7 +74,8 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [registrationOtp, setRegistrationOtp] = useState("");
-  const [registrationDelivery, setRegistrationDelivery] = useState<RegistrationOtpState | null>(null);
+  const [registrationDelivery, setRegistrationDelivery] =
+    useState<RegistrationOtpState | null>(null);
 
   const resetLoginState = () => {
     setLoginIdentifier("");
@@ -83,6 +107,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     }
 
     setRegisterRole(resolveRegisterRole(defaultRole));
+    // When defaultRole is 'vendor', automatically switch to register tab
+    if (defaultRole === "vendor") {
+      setActiveTab("register");
+    }
   }, [defaultRole, open]);
 
   useEffect(() => {
@@ -117,12 +145,17 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     try {
       const sessionUser = await login(loginIdentifier, loginPassword);
       await closeModalForAlert();
-      await showSuccessAlert("Login successful", { text: "Redirecting you to your dashboard." });
+      await showSuccessAlert("Login successful", {
+        text: "Redirecting you to your dashboard.",
+      });
       onSuccess?.(sessionUser.role ?? "user");
     } catch (error) {
       await closeModalForAlert();
       await showErrorAlert("Login failed", {
-        text: error instanceof Error ? error.message : "Login failed. Please try again.",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Login failed. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -133,8 +166,16 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     event.preventDefault();
     setNotice(null);
 
-    if (!registerName || !registerIdentifier || !registerPassword || !confirmPassword) {
-      setNotice({ tone: "error", message: "Please fill in all registration fields." });
+    if (
+      !registerName ||
+      !registerIdentifier ||
+      !registerPassword ||
+      !confirmPassword
+    ) {
+      setNotice({
+        tone: "error",
+        message: "Please fill in all registration fields.",
+      });
       return;
     }
 
@@ -144,13 +185,21 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     }
 
     if (registerPassword.length < 8) {
-      setNotice({ tone: "error", message: "Password must be at least 8 characters." });
+      setNotice({
+        tone: "error",
+        message: "Password must be at least 8 characters.",
+      });
       return;
     }
 
     setIsLoading(true);
     try {
-      const delivery = await requestRegistrationOtp(registerName, registerIdentifier, registerPassword, registerRole);
+      const delivery = await requestRegistrationOtp(
+        registerName,
+        registerIdentifier,
+        registerPassword,
+        registerRole,
+      );
       setRegistrationDelivery({
         ...delivery,
         identifier: registerIdentifier.trim(),
@@ -163,7 +212,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "We could not send the OTP. Please try again.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "We could not send the OTP. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -186,7 +238,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
 
     setIsLoading(true);
     try {
-      const sessionUser = await verifyRegistrationOtp(registrationDelivery.identifier, registrationOtp);
+      const sessionUser = await verifyRegistrationOtp(
+        registrationDelivery.identifier,
+        registrationOtp,
+      );
       await closeModalForAlert();
       await showSuccessAlert("Registration successful", {
         text: "Your account was verified and created successfully.",
@@ -195,7 +250,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     } catch (error) {
       await closeModalForAlert();
       await showErrorAlert("OTP verification failed", {
-        text: error instanceof Error ? error.message : "The OTP is invalid. Please try again.",
+        text:
+          error instanceof Error
+            ? error.message
+            : "The OTP is invalid. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -206,13 +264,21 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     setNotice(null);
 
     if (!registerName || !registerIdentifier || !registerPassword) {
-      setNotice({ tone: "error", message: "Complete the registration form first." });
+      setNotice({
+        tone: "error",
+        message: "Complete the registration form first.",
+      });
       return;
     }
 
     setIsLoading(true);
     try {
-      const delivery = await requestRegistrationOtp(registerName, registerIdentifier, registerPassword, registerRole);
+      const delivery = await requestRegistrationOtp(
+        registerName,
+        registerIdentifier,
+        registerPassword,
+        registerRole,
+      );
       setRegistrationDelivery({
         ...delivery,
         identifier: registerIdentifier.trim(),
@@ -225,7 +291,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "We could not resend the OTP.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "We could not resend the OTP.",
       });
     } finally {
       setIsLoading(false);
@@ -236,7 +305,9 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     setNotice(null);
     setIsLoading(true);
     try {
-      const sessionUser = await loginWithGoogle(activeTab === "register" ? registerRole : undefined);
+      const sessionUser = await loginWithGoogle(
+        activeTab === "register" ? registerRole : undefined,
+      );
       await closeModalForAlert();
       await showSuccessAlert("Google login successful", {
         text: "Redirecting you to your dashboard.",
@@ -245,7 +316,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     } catch (error) {
       await closeModalForAlert();
       await showErrorAlert("Google login failed", {
-        text: error instanceof Error ? error.message : "Google login failed. Please try again.",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Google login failed. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -256,7 +330,9 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">Welcome to Photorido</DialogTitle>
+          <DialogTitle className="text-center text-2xl">
+            Welcome to Photorido
+          </DialogTitle>
           <DialogDescription className="text-center">
             Login or create an account to get started
           </DialogDescription>
@@ -276,7 +352,11 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
           </div>
         )}
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "register")} className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as "login" | "register")}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
@@ -316,7 +396,11 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                disabled={isLoading}
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Login
               </Button>
@@ -326,11 +410,19 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
                 </div>
               </div>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={isLoading}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+              >
                 Login with Google
               </Button>
             </form>
@@ -344,7 +436,9 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                   <Button
                     key={role.value}
                     type="button"
-                    variant={registerRole === role.value ? "default" : "outline"}
+                    variant={
+                      registerRole === role.value ? "default" : "outline"
+                    }
                     onClick={() => setRegisterRole(role.value)}
                     className="w-full"
                   >
@@ -356,18 +450,28 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
             </div>
 
             {registrationDelivery ? (
-              <form onSubmit={handleVerifyRegistrationOtp} className="space-y-4">
+              <form
+                onSubmit={handleVerifyRegistrationOtp}
+                className="space-y-4"
+              >
                 <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900">
                   <p className="font-semibold">Verify your OTP</p>
                   <p className="mt-1">
-                    Enter the 6-digit OTP sent to <span className="font-medium">{registrationDelivery.maskedDestination}</span>.
+                    Enter the 6-digit OTP sent to{" "}
+                    <span className="font-medium">
+                      {registrationDelivery.maskedDestination}
+                    </span>
+                    .
                   </p>
                   <p className="mt-2 text-xs text-blue-700">
-                    This OTP expires in {registrationDelivery.expiresInMinutes} minutes.
+                    This OTP expires in {registrationDelivery.expiresInMinutes}{" "}
+                    minutes.
                   </p>
-                  {registrationDelivery.deliveryMode === "mailtrap-mobile-fallback" && (
+                  {registrationDelivery.deliveryMode ===
+                    "mailtrap-mobile-fallback" && (
                     <p className="mt-2 text-xs text-blue-700">
-                      Mobile OTP is being routed to the configured Mailtrap inbox for development.
+                      Mobile OTP is being routed to the configured Mailtrap
+                      inbox for development.
                     </p>
                   )}
                   {registrationDelivery.previewOtp && (
@@ -396,13 +500,25 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                  disabled={isLoading}
+                >
+                  {isLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Verify OTP
                 </Button>
 
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="w-full" onClick={handleResendRegistrationOtp} disabled={isLoading}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleResendRegistrationOtp}
+                    disabled={isLoading}
+                  >
                     Resend OTP
                   </Button>
                   <Button
@@ -420,7 +536,10 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleRequestRegistrationOtp} className="space-y-4">
+              <form
+                onSubmit={handleRequestRegistrationOtp}
+                className="space-y-4"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
                   <div className="relative">
@@ -446,7 +565,9 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                       type="text"
                       placeholder="Enter email or mobile number"
                       value={registerIdentifier}
-                      onChange={(event) => setRegisterIdentifier(event.target.value)}
+                      onChange={(event) =>
+                        setRegisterIdentifier(event.target.value)
+                      }
                       className="pl-10"
                       disabled={isLoading}
                     />
@@ -462,7 +583,9 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                       type="password"
                       placeholder="Password"
                       value={registerPassword}
-                      onChange={(event) => setRegisterPassword(event.target.value)}
+                      onChange={(event) =>
+                        setRegisterPassword(event.target.value)
+                      }
                       className="pl-10"
                       disabled={isLoading}
                     />
@@ -478,15 +601,23 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                       type="password"
                       placeholder="Confirm password"
                       value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
                       className="pl-10"
                       disabled={isLoading}
                     />
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                  disabled={isLoading}
+                >
+                  {isLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Send OTP
                 </Button>
 
@@ -495,11 +626,19 @@ export function LoginModal({ open, onClose, defaultRole = "user", onSuccess }: L
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
                   </div>
                 </div>
 
-                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={isLoading}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                >
                   Register with Google
                 </Button>
               </form>

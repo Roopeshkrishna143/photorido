@@ -2,8 +2,20 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { api, getErrorMessage, getStoredAuthToken, unwrapArray, unwrapPayload } from "../lib/api";
+import { resolvePublicAssetUrl } from "../lib/media";
 
-export type ManagedUserRole = "super-admin" | "vendor" | "user";
+export type ManagedUserRole =
+  | "super-admin"
+  | "admin"
+  | "vendor"
+  | "user"
+  | "staff"
+  | "vendor_verification_officer"
+  | "booking_coordinator"
+  | "support_executive"
+  | "content_moderator"
+  | "finance_manager"
+  | "marketing_manager";
 export type BookingStatus =
   | "pending"
   | "approved_by_vendor"
@@ -64,6 +76,16 @@ export interface MarketplaceBooking {
   paymentRequested: boolean;
   withdrawalRequested: boolean;
   reviewSubmitted?: boolean;
+  operationsNote?: string;
+  escalatedAt?: string | null;
+  escalationResolvedAt?: string | null;
+  rescheduledAt?: string | null;
+  rescheduleResolvedAt?: string | null;
+  activityHistory?: Array<{
+    type: string;
+    note: string;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +113,10 @@ export interface MarketplaceReview {
   comment: string;
   vendorResponse?: string | null;
   respondedAt?: string | null;
+  moderationStatus?: "active" | "hidden" | "removed";
+  moderationNote?: string;
+  warnedAt?: string | null;
+  banEscalatedAt?: string | null;
   createdAt: string;
 }
 
@@ -213,6 +239,23 @@ export interface MarketplaceListing {
     videoId?: string | null;
   }>;
   status: ListingStatus;
+  verificationNote?: string;
+  requestedDocuments?: string[];
+  documentRequestMessage?: string;
+  documentUploads?: Array<{
+    fileName: string;
+    originalName: string;
+    url: string;
+    contentType: string;
+    size: number;
+    uploadedAt: string;
+  }>;
+  documentsRequestedAt?: string | null;
+  documentsSubmittedAt?: string | null;
+  verificationStatusChangedAt?: string | null;
+  mediaModerationNote?: string;
+  mediaWarnedAt?: string | null;
+  mediaBanEscalatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -453,6 +496,24 @@ const RESOURCE_ENDPOINTS = {
 const ROLE_RESOURCE_MAP: Record<ManagedUserRole, (keyof MarketplaceSnapshot)[]> = {
   user: ["bookings", "conversations", "notifications", "reviews"],
   vendor: ["bookings", "conversations", "notifications", "reviews", "categories", "subCategories", "listings"],
+  admin: [
+    "bookings",
+    "notifications",
+    "reviews",
+    "platformUsers",
+    "categories",
+    "browseServiceCards",
+    "searchAdvertisements",
+    "subCategories",
+    "listings",
+  ],
+  staff: ["bookings", "notifications", "platformUsers", "listings"],
+  vendor_verification_officer: ["notifications", "platformUsers", "categories", "subCategories", "listings"],
+  booking_coordinator: ["bookings", "notifications"],
+  support_executive: ["notifications", "platformUsers"],
+  content_moderator: ["notifications", "reviews", "listings"],
+  finance_manager: ["bookings", "notifications"],
+  marketing_manager: ["notifications", "browseServiceCards", "searchAdvertisements", "listings"],
   "super-admin": [
     "bookings",
     "conversations",
@@ -476,6 +537,22 @@ async function fetchCollection<T>(path: string) {
     query: { limit: 1000 },
   });
   return unwrapArray<T>(payload);
+}
+
+function normalizeListingAssetUrls(listing: MarketplaceListing): MarketplaceListing {
+  return {
+    ...listing,
+    image: resolvePublicAssetUrl(listing.image),
+    portfolio: (listing.portfolio ?? []).map((url) => resolvePublicAssetUrl(url)),
+    albums: (listing.albums ?? []).map((album) => ({
+      ...album,
+      images: album.images.map((url) => resolvePublicAssetUrl(url)),
+    })),
+    documentUploads: (listing.documentUploads ?? []).map((document) => ({
+      ...document,
+      url: resolvePublicAssetUrl(document.url),
+    })),
+  };
 }
 
 function getSocketUrl() {
@@ -521,7 +598,9 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
 
           if (result.status === "fulfilled") {
             const [, items] = result.value;
-            nextSnapshot[resourceKey] = items as never;
+            nextSnapshot[resourceKey] = (resourceKey === "listings"
+              ? (items as MarketplaceListing[]).map(normalizeListingAssetUrls)
+              : items) as never;
             return;
           }
 

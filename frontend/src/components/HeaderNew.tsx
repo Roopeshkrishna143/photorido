@@ -1,4 +1,13 @@
-import { Bell, ChevronDown, LogOut, Menu, Settings, User as UserIcon, LayoutDashboard, X } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Menu,
+  Settings,
+  User as UserIcon,
+  LayoutDashboard,
+  X,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "motion/react";
 import logoImage from "figma:asset/1a7396ce0df98b8e9d99c9694dadb671a2b68d89.png";
@@ -42,10 +51,23 @@ export function HeaderNew({
 
   const getRoleLabel = () => {
     if (user?.role === "super-admin") return "Super Admin";
+    if (user?.role === "admin") return "Admin";
     if (user?.role === "vendor") return "Professional";
+    if (user?.role === "staff") return "Staff";
+    if (user?.role === "vendor_verification_officer")
+      return "Verification Officer";
+    if (user?.role === "booking_coordinator") return "Booking Coordinator";
+    if (user?.role === "support_executive") return "Support Executive";
+    if (user?.role === "content_moderator") return "Content Moderator";
+    if (user?.role === "finance_manager") return "Finance Manager";
+    if (user?.role === "marketing_manager") return "Marketing Manager";
     if (user?.role === "user") return "User";
     return "Guest";
   };
+
+  const isInternalRole = Boolean(
+    user?.role && user.role !== "vendor" && user.role !== "user",
+  );
 
   return (
     <>
@@ -57,7 +79,6 @@ export function HeaderNew({
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-20 items-center justify-between">
-
             {/* Logo */}
             <motion.div
               className="flex items-center cursor-pointer group"
@@ -102,10 +123,12 @@ export function HeaderNew({
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
-
               {/* Become a Pro — hidden for vendors, shown on md+ desktop */}
-              {user?.role !== "vendor" && user?.role !== "super-admin" && (
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              {user?.role !== "vendor" && !isInternalRole && (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <Button
                     onClick={onBecomePro}
                     className="hidden md:flex gap-2 bg-gradient-to-r from-[var(--blue-600)] to-[var(--blue-700)] hover:from-[var(--blue-700)] hover:to-[var(--blue-800)] shadow-md hover:shadow-lg transition-all rounded-xl"
@@ -117,7 +140,10 @@ export function HeaderNew({
 
               {/* Notifications — only when logged in */}
               {user && (
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
                   <Button
                     variant="ghost"
                     size="icon"
@@ -133,14 +159,21 @@ export function HeaderNew({
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
                       <Button
                         variant="ghost"
                         className="hidden lg:flex items-center gap-2 hover:bg-[var(--blue-50)]"
                       >
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--blue-500)] to-[var(--blue-700)] flex items-center justify-center overflow-hidden">
                           {user.avatar ? (
-                            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                            <img
+                              src={user.avatar}
+                              alt={user.name}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <UserIcon className="h-4 w-4 text-white" />
                           )}
@@ -153,8 +186,13 @@ export function HeaderNew({
                     <DropdownMenuLabel>
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                        <Badge variant="secondary" className="w-fit text-xs mt-1">
+                        <p className="text-xs text-muted-foreground">
+                          {user.email}
+                        </p>
+                        <Badge
+                          variant="secondary"
+                          className="w-fit text-xs mt-1"
+                        >
                           {getRoleLabel()}
                         </Badge>
                       </div>
@@ -164,7 +202,9 @@ export function HeaderNew({
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/dashboard?tab=settings")}>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard?tab=settings")}
+                    >
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
@@ -176,11 +216,15 @@ export function HeaderNew({
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="hidden lg:block">
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="hidden lg:block"
+                >
                   <Button
                     onClick={onLogin}
                     variant="outline"
-                    className="flex items-center gap-2 hover:bg-[var(--blue-50)] hover:border-[var(--blue-600)] hover:text-[var(--blue-600)]"
+                    className="flex items-center gap-2 hover:bg-[var(--blue-50)] hover:border-[var(--blue-600)] hover:text-[var(--blue-600)] rounded-xl"
                   >
                     <UserIcon className="h-4 w-4" />
                     Login
@@ -194,7 +238,11 @@ export function HeaderNew({
                 onClick={() => setMobileOpen((prev) => !prev)}
                 aria-label="Toggle navigation menu"
               >
-                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {mobileOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
               </button>
             </div>
           </div>
@@ -213,30 +261,41 @@ export function HeaderNew({
             className="fixed top-20 left-0 right-0 z-40 glass-strong border-b shadow-xl lg:hidden"
           >
             <div className="container mx-auto px-4 py-3 flex flex-col gap-0.5">
-
               {/* Nav links */}
               <button
-                onClick={() => { onFindProfessionals?.(); closeMobile(); }}
+                onClick={() => {
+                  onFindProfessionals?.();
+                  closeMobile();
+                }}
                 className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-[var(--foreground)] hover:bg-[var(--blue-50)] hover:text-[var(--blue-600)] transition-colors"
               >
                 Find Professionals
               </button>
               <button
-                onClick={() => { onServices?.(); closeMobile(); }}
+                onClick={() => {
+                  onServices?.();
+                  closeMobile();
+                }}
                 className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-[var(--foreground)] hover:bg-[var(--blue-50)] hover:text-[var(--blue-600)] transition-colors"
               >
                 Services
               </button>
               <button
-                onClick={() => { onHelp?.(); closeMobile(); }}
+                onClick={() => {
+                  onHelp?.();
+                  closeMobile();
+                }}
                 className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-[var(--foreground)] hover:bg-[var(--blue-50)] hover:text-[var(--blue-600)] transition-colors"
               >
                 Help
               </button>
 
-              {user?.role !== "vendor" && user?.role !== "super-admin" && (
+              {user?.role !== "vendor" && !isInternalRole && (
                 <button
-                  onClick={() => { onBecomePro?.(); closeMobile(); }}
+                  onClick={() => {
+                    onBecomePro?.();
+                    closeMobile();
+                  }}
                   className="w-full text-left px-4 py-3 rounded-xl text-[15px] font-semibold text-[var(--blue-600)] hover:bg-[var(--blue-50)] transition-colors"
                 >
                   Become a Pro
@@ -251,31 +310,54 @@ export function HeaderNew({
                   <div className="flex items-center gap-3 px-4 py-2">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--blue-500)] to-[var(--blue-700)] flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <UserIcon className="h-4 w-4 text-white" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--foreground)] truncate">{user.name}</p>
-                      <p className="text-xs text-[var(--muted-foreground)] truncate">{user.email}</p>
+                      <p className="text-sm font-semibold text-[var(--foreground)] truncate">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-[var(--muted-foreground)] truncate">
+                        {user.email}
+                      </p>
                     </div>
-                    <Badge variant="secondary" className="ml-auto text-xs flex-shrink-0">{getRoleLabel()}</Badge>
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto text-xs flex-shrink-0"
+                    >
+                      {getRoleLabel()}
+                    </Badge>
                   </div>
                   <button
-                    onClick={() => { onDashboard?.(); closeMobile(); }}
+                    onClick={() => {
+                      onDashboard?.();
+                      closeMobile();
+                    }}
                     className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-[var(--foreground)] hover:bg-[var(--blue-50)] hover:text-[var(--blue-600)] transition-colors flex items-center gap-3"
                   >
-                    <LayoutDashboard className="h-4 w-4 flex-shrink-0" /> Dashboard
+                    <LayoutDashboard className="h-4 w-4 flex-shrink-0" />{" "}
+                    Dashboard
                   </button>
                   <button
-                    onClick={() => { navigate("/dashboard?tab=settings"); closeMobile(); }}
+                    onClick={() => {
+                      navigate("/dashboard?tab=settings");
+                      closeMobile();
+                    }}
                     className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-[var(--foreground)] hover:bg-[var(--blue-50)] hover:text-[var(--blue-600)] transition-colors flex items-center gap-3"
                   >
                     <Settings className="h-4 w-4 flex-shrink-0" /> Settings
                   </button>
                   <button
-                    onClick={() => { logout(); closeMobile(); }}
+                    onClick={() => {
+                      logout();
+                      closeMobile();
+                    }}
                     className="w-full text-left px-4 py-3 rounded-xl text-[15px] text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
                   >
                     <LogOut className="h-4 w-4 flex-shrink-0" /> Logout
@@ -283,7 +365,10 @@ export function HeaderNew({
                 </>
               ) : (
                 <button
-                  onClick={() => { onLogin?.(); closeMobile(); }}
+                  onClick={() => {
+                    onLogin?.();
+                    closeMobile();
+                  }}
                   className="w-full text-left px-4 py-3 rounded-xl text-[15px] font-semibold text-[var(--blue-600)] hover:bg-[var(--blue-50)] transition-colors flex items-center gap-3"
                 >
                   <UserIcon className="h-4 w-4 flex-shrink-0" /> Login

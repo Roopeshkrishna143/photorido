@@ -8,6 +8,7 @@ import { syncMongoDbExportsOnBoot } from "./startup/sync-mongodb-exports.js";
 import { seedRbac } from "./startup/seed-rbac.js";
 import { seedBrowseServices } from "./startup/seed-browse-services.js";
 import { seedSearchAdvertisements } from "./startup/seed-search-advertisements.js";
+import { seedSupportTickets } from "./startup/seed-support-tickets.js";
 
 async function startServer() {
   await connectToDatabase();
@@ -16,6 +17,7 @@ async function startServer() {
   await seedRbac();
   await seedBrowseServices();
   await seedSearchAdvertisements();
+  await seedSupportTickets();
 
   const app = createApp();
   const httpServer = createServer(app);

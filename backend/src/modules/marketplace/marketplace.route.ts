@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
+import { requireAuth, authorizePermissions, authorizeRoles, type AuthenticatedRequest } from "../../middleware/auth.js";
 import { UserModel } from "../../models/user.model.js";
 import { BrowseServiceCardModel } from "../../models/browse-service-card.model.js";
 import { CategoryModel } from "../../models/category.model.js";
@@ -23,6 +23,7 @@ import {
   serializeCategory,
   serializeMarketplaceListing,
   serializeNotification,
+  serializePendingVendorAccount,
   serializePlatformUser,
   serializeSearchAdvertisement,
   serializeSubCategory,
@@ -108,6 +109,33 @@ const listingSchema = z.object({
   ).default([]),
 });
 
+const documentUploadSchema = z.object({
+  fileName: z.string().trim().min(1),
+  originalName: z.string().trim().min(1),
+  url: z.string().trim().min(1),
+  contentType: z.string().trim().min(1),
+  size: z.coerce.number().min(0),
+  uploadedAt: z.string().trim().optional(),
+});
+
+const removeDocumentUploadSchema = z.object({
+  url: z.string().trim().min(1),
+});
+
+function getUploadUrlPath(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const parsedUrl = new URL(trimmed);
+    return parsedUrl.pathname;
+  } catch {
+    return trimmed;
+  }
+}
+
 const locationResolveSchema = z.object({
   input: z.string().trim().min(1, "Location input is required."),
 });
@@ -141,7 +169,7 @@ marketplaceRouter.use(requireAuth);
 
 marketplaceRouter.get(
   "/users",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users", "view_users_limited", "view_vendors_limited"),
   asyncHandler(async (_request, response) => {
     const users = await UserModel.find().sort({ createdAt: -1 });
     response.status(200).json({
@@ -228,7 +256,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/categories",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -255,7 +283,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/categories/:categoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request, response) => {
     const input = categorySchema.parse(request.body);
     const category = await CategoryModel.findById(request.params.categoryId);
@@ -293,7 +321,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/categories/:categoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_categories"),
   asyncHandler(async (request, response) => {
     const category = await CategoryModel.findById(request.params.categoryId);
     if (!category) {
@@ -324,7 +352,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/browse-services",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -351,7 +379,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/browse-services/:browseServiceCardId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request, response) => {
     const input = browseServiceCardSchema.parse(request.body);
     const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
@@ -384,7 +412,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/browse-services/:browseServiceCardId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_browse_services", "manage_homepage_banners"),
   asyncHandler(async (request, response) => {
     const browseServiceCard = await BrowseServiceCardModel.findById(request.params.browseServiceCardId);
     if (!browseServiceCard) {
@@ -402,7 +430,7 @@ marketplaceRouter.delete(
 
 marketplaceRouter.get(
   "/search-advertisements",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (_request, response) => {
     const advertisements = await SearchAdvertisementModel.find().sort({
       sortOrder: 1,
@@ -418,7 +446,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/search-advertisements",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -460,7 +488,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/search-advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -504,7 +532,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/search-advertisements/:advertisementId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_search_advertisements"),
   asyncHandler(async (request, response) => {
     const advertisement = await SearchAdvertisementModel.findById(request.params.advertisementId);
     if (!advertisement) {
@@ -536,7 +564,7 @@ marketplaceRouter.get(
 
 marketplaceRouter.post(
   "/sub-categories",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     if (!request.authUser) {
       throw new HttpError(401, "Authentication is required.");
@@ -571,7 +599,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.patch(
   "/sub-categories/:subCategoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request, response) => {
     const input = subCategorySchema.parse(request.body);
     const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
@@ -619,7 +647,7 @@ marketplaceRouter.patch(
 
 marketplaceRouter.delete(
   "/sub-categories/:subCategoryId",
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_sub_categories"),
   asyncHandler(async (request, response) => {
     const subCategory = await SubCategoryModel.findById(request.params.subCategoryId);
     if (!subCategory) {
@@ -657,17 +685,33 @@ marketplaceRouter.get(
       throw new HttpError(401, "Authentication is required.");
     }
 
-    const query = request.authUser.role === "super-admin"
+    const isOperationalRole = request.authUser.role !== "vendor" && request.authUser.role !== "user";
+    const query = isOperationalRole
       ? {}
       : request.authUser.role === "vendor"
         ? { vendorId: request.authUser.id }
         : { status: "approved" };
 
     const listings = await VendorProfileModel.find(query).sort({ createdAt: -1, updatedAt: -1 });
+    // const listingPayload = listings.map((listing) => serializeMarketplaceListing(listing));
+      const listingPayload: any[] = listings.map((listing) => serializeMarketplaceListing(listing));
+    if (isOperationalRole) {
+      const profileVendorIds = new Set(listings.map((listing) => listing.vendorId));
+      const vendorsWithoutProfiles = await UserModel.find({
+        role: "vendor",
+        status: { $in: ["active", "invited"] },
+      }).sort({ createdAt: -1 });
+
+      listingPayload.push(
+        ...vendorsWithoutProfiles
+          .filter((vendor) => !profileVendorIds.has(vendor.id))
+          .map((vendor) => serializePendingVendorAccount(vendor)),
+      );
+    }
 
     response.status(200).json({
       success: true,
-      data: listings.map((listing) => serializeMarketplaceListing(listing)),
+      data: listingPayload,
     });
   }),
 );
@@ -680,13 +724,14 @@ marketplaceRouter.post(
       throw new HttpError(401, "Authentication is required.");
     }
 
+    const authUser = request.authUser;
     const input = listingSchema.parse(request.body);
     const { category, subCategory } = await validateCategoryAndSubCategory(input.categoryId, input.subCategoryId);
 
     const profile = await VendorProfileModel.create({
-      vendorId: request.authUser.id,
-      vendorName: request.authUser.name,
-      vendorEmail: request.authUser.email,
+      vendorId: authUser.id,
+      vendorName: authUser.name,
+      vendorEmail: authUser.email,
       title: input.title,
       categoryId: category.id,
       category: category.name,
@@ -713,18 +758,27 @@ marketplaceRouter.post(
       status: "pending",
     });
 
-    await UserModel.findByIdAndUpdate(request.authUser.id, {
+    await UserModel.findByIdAndUpdate(authUser.id, {
       $set: { profileComplete: true },
     });
 
-    const notifications = buildProfileCreatedNotifications(request.authUser.name);
+    const notifications = buildProfileCreatedNotifications(authUser.name);
+    const officers = await UserModel.find({ role: "vendor_verification_officer", status: "active" }).select("_id role");
     await Promise.all([
-      createUserNotification(request.authUser.id, "vendor", notifications.vendor, {
+      createUserNotification(authUser.id, "vendor", notifications.vendor, {
         targetPath: NOTIFICATION_TARGET_PATHS.listings,
       }),
       notifyAllSuperAdmins(notifications.admin, {
         targetPath: NOTIFICATION_TARGET_PATHS.listings,
       }),
+      ...officers.map((officer) =>
+        createUserNotification(
+          officer.id,
+          "vendor_verification_officer",
+          `${authUser.name} created a new profile pending verification.`,
+          { targetPath: "/dashboard?tab=pending-vendors" },
+        ),
+      ),
     ]);
 
     response.status(201).json({
@@ -754,6 +808,7 @@ marketplaceRouter.patch(
       throw new HttpError(403, "You can only edit your own profiles.");
     }
 
+    const shouldMarkDocumentsSubmitted = authUser.role === "vendor" && Boolean(listing.documentsRequestedAt) && !listing.documentsSubmittedAt;
     const { category, subCategory } = await validateCategoryAndSubCategory(input.categoryId, input.subCategoryId);
 
     listing.title = input.title;
@@ -779,7 +834,32 @@ marketplaceRouter.patch(
     listing.portfolioImages = input.portfolioImages;
     listing.albums = input.albums;
     listing.youtubeLinks = input.youtubeLinks;
+
+    if (shouldMarkDocumentsSubmitted) {
+      listing.status = "pending";
+      listing.documentsSubmittedAt = new Date();
+      listing.verificationNote = "Vendor submitted updated profile documents for review.";
+      listing.verificationStatusChangedAt = new Date();
+    }
+
     await listing.save();
+
+    if (shouldMarkDocumentsSubmitted) {
+      await notifyAllSuperAdmins(`${listing.vendorName} submitted updated verification documents.`, {
+        targetPath: NOTIFICATION_TARGET_PATHS.listings,
+      });
+      const officers = await UserModel.find({ role: "vendor_verification_officer", status: "active" }).select("_id role");
+      await Promise.all(
+        officers.map((officer) =>
+          createUserNotification(
+            officer.id,
+            "vendor_verification_officer",
+            `${listing.vendorName} submitted requested documents for ${listing.title}.`,
+            { targetPath: "/dashboard?tab=verification-requests" },
+          ),
+        ),
+      );
+    }
 
     response.status(200).json({
       success: true,
@@ -790,8 +870,159 @@ marketplaceRouter.patch(
 );
 
 marketplaceRouter.post(
+  "/listings/:listingId/document-uploads",
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const uploads = z.array(documentUploadSchema).min(1).max(12).parse(request.body?.uploads ?? request.body);
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    if (listing.vendorId !== authUser.id) {
+      throw new HttpError(403, "You can only upload documents for your own profiles.");
+    }
+
+    if (!listing.documentsRequestedAt) {
+      throw new HttpError(400, "This profile does not have an open document request.");
+    }
+
+    const existingUrls = new Set((listing.documentUploads ?? []).map((document) => document.url));
+    listing.documentUploads = [
+      ...(listing.documentUploads ?? []),
+      ...uploads
+        .filter((upload) => !existingUrls.has(upload.url))
+        .map((upload) => ({
+          fileName: upload.fileName,
+          originalName: upload.originalName,
+          url: upload.url,
+          contentType: upload.contentType,
+          size: upload.size,
+          uploadedAt: upload.uploadedAt ? new Date(upload.uploadedAt) : new Date(),
+        })),
+    ];
+    listing.verificationStatusChangedAt = new Date();
+    await listing.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Documents attached successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.delete(
+  "/listings/:listingId/document-uploads",
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const input = removeDocumentUploadSchema.parse(request.body);
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    if (listing.vendorId !== authUser.id) {
+      throw new HttpError(403, "You can only remove documents for your own profiles.");
+    }
+
+    if (!listing.documentsRequestedAt) {
+      throw new HttpError(400, "This profile does not have an open document request.");
+    }
+
+    if (listing.documentsSubmittedAt) {
+      throw new HttpError(400, "Submitted documents can no longer be removed.");
+    }
+
+    const targetPath = getUploadUrlPath(input.url);
+    const originalCount = listing.documentUploads?.length ?? 0;
+    listing.documentUploads = (listing.documentUploads ?? []).filter((document) => {
+      return document.url !== input.url && getUploadUrlPath(document.url) !== targetPath;
+    });
+
+    if ((listing.documentUploads?.length ?? 0) === originalCount) {
+      throw new HttpError(404, "Uploaded document not found.");
+    }
+
+    listing.verificationStatusChangedAt = new Date();
+    await listing.save();
+
+    response.status(200).json({
+      success: true,
+      message: "Document removed successfully.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.post(
+  "/listings/:listingId/submit-documents",
+  authorizeRoles("vendor"),
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new HttpError(401, "Authentication is required.");
+    }
+
+    const listing = await VendorProfileModel.findById(request.params.listingId);
+    if (!listing) {
+      throw new HttpError(404, "Profile not found.");
+    }
+
+    if (listing.vendorId !== authUser.id) {
+      throw new HttpError(403, "You can only submit documents for your own profiles.");
+    }
+
+    if (!listing.documentsRequestedAt) {
+      throw new HttpError(400, "This profile does not have an open document request.");
+    }
+
+    if ((listing.documentUploads ?? []).length === 0) {
+      throw new HttpError(400, "Upload at least one requested document before submitting.");
+    }
+
+    listing.status = "pending";
+    listing.documentsSubmittedAt = new Date();
+    listing.verificationNote = "Vendor submitted requested documents for review.";
+    listing.verificationStatusChangedAt = new Date();
+    await listing.save();
+
+    const officers = await UserModel.find({ role: "vendor_verification_officer", status: "active" }).select("_id role");
+    await Promise.all([
+      notifyAllSuperAdmins(`${listing.vendorName} submitted requested verification documents.`, {
+        targetPath: NOTIFICATION_TARGET_PATHS.listings,
+      }),
+      ...officers.map((officer) =>
+        createUserNotification(
+          officer.id,
+          "vendor_verification_officer",
+          `${listing.vendorName} submitted requested documents for ${listing.title}.`,
+          { targetPath: "/dashboard?tab=verification-requests" },
+        ),
+      ),
+    ]);
+
+    response.status(200).json({
+      success: true,
+      message: "Requested documents submitted.",
+      data: serializeMarketplaceListing(listing),
+    });
+  }),
+);
+
+marketplaceRouter.post(
   "/listings/:listingId/approve",
-  authorizeRoles("super-admin"),
+  authorizePermissions("moderate_profiles", "verify_vendor", "change_verification_status"),
   asyncHandler(async (request, response) => {
     const listing = await VendorProfileModel.findById(request.params.listingId);
     if (!listing) {
@@ -799,6 +1030,12 @@ marketplaceRouter.post(
     }
 
     listing.status = "approved";
+    listing.documentsRequestedAt = null;
+    listing.documentsSubmittedAt = null;
+    listing.requestedDocuments = [];
+    listing.documentRequestMessage = "";
+    listing.verificationNote = "";
+    listing.verificationStatusChangedAt = new Date();
     await listing.save();
 
     await createUserNotification(listing.vendorId, "vendor", buildProfileModerationMessage("approved"), {
@@ -815,7 +1052,7 @@ marketplaceRouter.post(
 
 marketplaceRouter.post(
   "/listings/:listingId/reject",
-  authorizeRoles("super-admin"),
+  authorizePermissions("moderate_profiles", "reject_vendor", "change_verification_status"),
   asyncHandler(async (request, response) => {
     const listing = await VendorProfileModel.findById(request.params.listingId);
     if (!listing) {
@@ -823,6 +1060,11 @@ marketplaceRouter.post(
     }
 
     listing.status = "rejected";
+    listing.documentsRequestedAt = null;
+    listing.documentsSubmittedAt = null;
+    listing.requestedDocuments = [];
+    listing.documentRequestMessage = "";
+    listing.verificationStatusChangedAt = new Date();
     await listing.save();
 
     await createUserNotification(listing.vendorId, "vendor", buildProfileModerationMessage("rejected"), {

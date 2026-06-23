@@ -26,7 +26,7 @@ import {
   type SearchAdvertisementDocument,
 } from "../../models/search-advertisement.model.js";
 import { SubCategoryModel, type SubCategoryDocument } from "../../models/sub-category.model.js";
-import { UserModel, type UserDocument, type UserRole } from "../../models/user.model.js";
+import { USER_ROLES, UserModel, type UserDocument, type UserRole } from "../../models/user.model.js";
 import { VendorProfileModel, type VendorProfileDocument } from "../../models/vendor-profile.model.js";
 import { VendorScheduleModel, type VendorScheduleDocument } from "../../models/vendor-schedule.model.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -38,6 +38,24 @@ interface ReviewStats {
 
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function normalizeUploadedAssetPath(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("/uploads/")) {
+    return trimmed;
+  }
+
+  try {
+    const parsedUrl = new URL(trimmed);
+    return parsedUrl.pathname.startsWith("/uploads/") ? parsedUrl.pathname : trimmed;
+  } catch {
+    return trimmed;
+  }
 }
 
 function pickAddressComponent(
@@ -137,13 +155,14 @@ export function serializeNotification(notification: MarketplaceNotificationDocum
 }
 
 export function serializePlatformUser(user: UserDocument) {
-  const normalizedRole = user.role === "super-admin" || user.role === "vendor" || user.role === "user"
-    ? user.role
-    : user.role === "super_admin" || user.role === "admin"
+  const rawRole = String(user.role);
+  const normalizedRole = USER_ROLES.includes(rawRole as UserRole)
+    ? rawRole as UserRole
+    : rawRole === "super_admin"
       ? "super-admin"
-      : user.role === "consumer" || user.role === "customer"
+      : rawRole === "consumer" || rawRole === "customer"
         ? "user"
-        : user.role === "professional"
+        : rawRole === "professional"
           ? "vendor"
           : "user";
   const normalizedStatus = user.status === "active" || user.status === "invited" || user.status === "disabled"
@@ -191,8 +210,74 @@ export function serializeMarketplaceListing(profile: VendorProfileDocument) {
     albums: profile.albums,
     youtubeLinks: profile.youtubeLinks,
     status: profile.status,
+    verificationNote: profile.verificationNote ?? "",
+    requestedDocuments: profile.requestedDocuments ?? [],
+    documentRequestMessage: profile.documentRequestMessage ?? "",
+    documentUploads: (profile.documentUploads ?? []).map((document) => ({
+      fileName: document.fileName,
+      originalName: document.originalName,
+      url: normalizeUploadedAssetPath(document.url),
+      contentType: document.contentType,
+      size: document.size,
+      uploadedAt: toIsoString(document.uploadedAt),
+    })),
+    documentsRequestedAt: profile.documentsRequestedAt ? toIsoString(profile.documentsRequestedAt) : null,
+    documentsSubmittedAt: profile.documentsSubmittedAt ? toIsoString(profile.documentsSubmittedAt) : null,
+    verificationStatusChangedAt: profile.verificationStatusChangedAt
+      ? toIsoString(profile.verificationStatusChangedAt)
+      : null,
+    mediaModerationNote: profile.mediaModerationNote ?? "",
+    mediaWarnedAt: profile.mediaWarnedAt ? toIsoString(profile.mediaWarnedAt) : null,
+    mediaBanEscalatedAt: profile.mediaBanEscalatedAt ? toIsoString(profile.mediaBanEscalatedAt) : null,
     createdAt: toIsoString(profile.createdAt),
     updatedAt: toIsoString(profile.updatedAt),
+  };
+}
+
+export function serializePendingVendorAccount(user: UserDocument) {
+  const createdAt = toIsoString(user.createdAt);
+
+  return {
+    id: `vendor-account-${user.id}`,
+    vendorId: user.id,
+    vendorName: user.name,
+    vendorEmail: user.email,
+    title: user.name,
+    categoryId: "",
+    category: "Profile Not Submitted",
+    subCategoryId: "",
+    subCategory: "",
+    city: "",
+    state: "",
+    district: "",
+    area: "",
+    address: "",
+    colony: "",
+    pincode: "",
+    price: "",
+    image: "",
+    featuredImageCrop: null,
+    description: "",
+    experience: "",
+    locationInput: user.location || "",
+    placeId: "",
+    coordinates: undefined,
+    portfolio: [],
+    albums: [],
+    youtubeLinks: [],
+    status: "pending" as const,
+    verificationNote: "Profile Not Submitted",
+    requestedDocuments: [],
+    documentRequestMessage: "",
+    documentUploads: [],
+    documentsRequestedAt: null,
+    documentsSubmittedAt: null,
+    verificationStatusChangedAt: null,
+    mediaModerationNote: "",
+    mediaWarnedAt: null,
+    mediaBanEscalatedAt: null,
+    createdAt,
+    updatedAt: user.updatedAt ? toIsoString(user.updatedAt) : createdAt,
   };
 }
 
@@ -217,6 +302,16 @@ export function serializeBooking(booking: MarketplaceBookingDocument) {
     paymentRequested: booking.paymentRequested,
     withdrawalRequested: booking.withdrawalRequested,
     reviewSubmitted: booking.reviewSubmitted,
+    operationsNote: booking.operationsNote ?? "",
+    escalatedAt: booking.escalatedAt ? toIsoString(booking.escalatedAt) : null,
+    escalationResolvedAt: booking.escalationResolvedAt ? toIsoString(booking.escalationResolvedAt) : null,
+    rescheduledAt: booking.rescheduledAt ? toIsoString(booking.rescheduledAt) : null,
+    rescheduleResolvedAt: booking.rescheduleResolvedAt ? toIsoString(booking.rescheduleResolvedAt) : null,
+    activityHistory: (booking.activityHistory ?? []).map((entry) => ({
+      type: entry.type,
+      note: entry.note,
+      createdAt: toIsoString(entry.createdAt),
+    })),
     createdAt: toIsoString(booking.createdAt),
     updatedAt: toIsoString(booking.updatedAt),
   };
@@ -237,6 +332,10 @@ export function serializeReview(review: MarketplaceReviewDocument) {
     comment: review.comment,
     vendorResponse: review.vendorResponse ?? null,
     respondedAt: review.respondedAt ? toIsoString(review.respondedAt) : null,
+    moderationStatus: review.moderationStatus ?? "active",
+    moderationNote: review.moderationNote ?? "",
+    warnedAt: review.warnedAt ? toIsoString(review.warnedAt) : null,
+    banEscalatedAt: review.banEscalatedAt ? toIsoString(review.banEscalatedAt) : null,
     createdAt: toIsoString(review.createdAt),
   };
 }
@@ -275,6 +374,7 @@ export function serializePhotographerReviewItem(review: MarketplaceReviewDocumen
     comment: review.comment,
     vendorResponse: review.vendorResponse ?? null,
     respondedAt: review.respondedAt ? toIsoString(review.respondedAt) : null,
+    moderationStatus: review.moderationStatus ?? "active",
     createdAt: toIsoString(review.createdAt),
   };
 }
@@ -441,7 +541,13 @@ export async function buildReviewStatsByPhotographerIds(photographerIds: string[
 }
 
 export async function buildPhotographerReviewItems(photographerId: string, limit = 20) {
-  const reviews = await MarketplaceReviewModel.find({ photographerId })
+  const reviews = await MarketplaceReviewModel.find({
+    photographerId,
+    $or: [
+      { moderationStatus: "active" },
+      { moderationStatus: { $exists: false } },
+    ],
+  })
     .sort({ createdAt: -1 })
     .limit(limit);
 

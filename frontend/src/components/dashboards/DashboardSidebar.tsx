@@ -6,6 +6,8 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
+  AlertTriangle,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -21,6 +23,7 @@ import {
   Star,
   Tags,
   Users,
+  XCircle,
 } from "lucide-react";
 import logoImage from "figma:asset/1a7396ce0df98b8e9d99c9694dadb671a2b68d89.png";
 import { useAuth, UserRole } from "../../context/AuthContext";
@@ -58,6 +61,7 @@ const SUPER_ADMIN_NAV: NavCategory[] = [
       { label: "Sub-Categories", icon: Layers, key: "sub-categories" },
       { label: "User Management", icon: Users, key: "user-management" },
       { label: "User Profiles List", icon: ClipboardCheck, key: "listings" },
+      { label: "Support Activity", icon: MessageSquare, key: "support-activity" },
     ],
   },
 ];
@@ -93,21 +97,113 @@ const USER_NAV: NavCategory[] = [
   },
 ];
 
+const VERIFICATION_NAV: NavCategory[] = [
+  {
+    title: "Verification",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Pending Vendors", icon: ShieldCheck, key: "pending-vendors" },
+      { label: "Documents Submitted", icon: ClipboardCheck, key: "submitted-documents" },
+      { label: "Approved Vendors", icon: CheckCircle2, key: "approved-vendors" },
+      { label: "Rejected Vendors", icon: XCircle, key: "rejected-vendors" },
+      { label: "Verification Requests", icon: ClipboardCheck, key: "verification-requests" },
+    ],
+  },
+];
+
+const BOOKING_COORDINATOR_NAV: NavCategory[] = [
+  {
+    title: "Booking Operations",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Active Bookings", icon: BookOpen, key: "active-bookings" },
+      { label: "Reschedules", icon: CalendarDays, key: "reschedules" },
+      { label: "Escalations", icon: AlertTriangle, key: "booking-escalations" },
+    ],
+  },
+];
+
+const SUPPORT_NAV: NavCategory[] = [
+  {
+    title: "Support",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Tickets", icon: MessageSquare, key: "tickets" },
+      { label: "Assigned Tickets", icon: Users, key: "assigned-tickets" },
+      { label: "Escalations", icon: AlertTriangle, key: "support-escalations" },
+    ],
+  },
+];
+
+const MODERATION_NAV: NavCategory[] = [
+  {
+    title: "Moderation",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Reviews", icon: Star, key: "moderation-reviews" },
+      { label: "Media Queue", icon: ClipboardCheck, key: "media-queue" },
+      { label: "Warnings", icon: MessageSquare, key: "warnings" },
+      { label: "Ban Requests", icon: ShieldCheck, key: "ban-requests" },
+    ],
+  },
+];
+
+const FINANCE_NAV: NavCategory[] = [
+  {
+    title: "Finance",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Finance", icon: BarChart2, key: "finance" },
+    ],
+  },
+];
+
+const MARKETING_NAV: NavCategory[] = [
+  {
+    title: "Marketing",
+    items: [
+      { label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+      { label: "Marketing", icon: Megaphone, key: "marketing" },
+    ],
+  },
+];
+
 function getNavForRole(role: UserRole): NavCategory[] {
   if (role === "super-admin") return SUPER_ADMIN_NAV;
+  if (role === "admin") return SUPER_ADMIN_NAV;
   if (role === "vendor") return VENDOR_NAV;
+  if (role === "vendor_verification_officer") return VERIFICATION_NAV;
+  if (role === "booking_coordinator") return BOOKING_COORDINATOR_NAV;
+  if (role === "support_executive") return SUPPORT_NAV;
+  if (role === "content_moderator") return MODERATION_NAV;
+  if (role === "finance_manager") return FINANCE_NAV;
+  if (role === "marketing_manager") return MARKETING_NAV;
+  if (role === "staff") return SUPPORT_NAV;
   return USER_NAV;
 }
 
 function getRoleLabel(role: UserRole) {
   if (role === "super-admin") return "Super Admin";
+  if (role === "admin") return "Admin";
   if (role === "vendor") return "Professional";
+  if (role === "staff") return "Staff";
+  if (role === "vendor_verification_officer") return "Verification Officer";
+  if (role === "booking_coordinator") return "Booking Coordinator";
+  if (role === "support_executive") return "Support Executive";
+  if (role === "content_moderator") return "Content Moderator";
+  if (role === "finance_manager") return "Finance Manager";
+  if (role === "marketing_manager") return "Marketing Manager";
   return "User";
 }
 
 function getRoleBadgeColor(role: UserRole) {
   if (role === "super-admin") return "bg-purple-100 text-purple-700 border-purple-200";
+  if (role === "admin") return "bg-indigo-100 text-indigo-700 border-indigo-200";
   if (role === "vendor") return "bg-blue-100 text-blue-700 border-blue-200";
+  if (role === "user") return "bg-green-100 text-green-700 border-green-200";
+  if (role === "finance_manager") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (role === "marketing_manager") return "bg-amber-100 text-amber-700 border-amber-200";
+  if (role) return "bg-slate-100 text-slate-700 border-slate-200";
   return "bg-green-100 text-green-700 border-green-200";
 }
 
@@ -125,7 +221,7 @@ export function DashboardSidebar({ activeKey, onNavigate }: DashboardSidebarProp
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
 
   const navCategories = getNavForRole(user?.role ?? null);
-  const roleKey = user?.role === "vendor" || user?.role === "super-admin" ? user.role : "user";
+  const roleKey = user?.role ?? "user";
   const unreadNotifications = notifications.filter((notification) => notification.role === roleKey && !notification.read).length;
   const unreadMessages =
     user?.role === "user"

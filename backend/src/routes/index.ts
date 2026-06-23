@@ -12,6 +12,7 @@ import { settingsRouter } from "../modules/settings/settings.route.js";
 import { siteRouter } from "../modules/site/site.route.js";
 import { uploadRouter } from "../modules/uploads/upload.route.js";
 import { vendorRouter } from "../modules/vendors/vendor.route.js";
+import { operationsRouter } from "../modules/operations/operations.route.js";
 import { healthRouter } from "./health.route.js";
 
 const apiRouter = Router();
@@ -28,6 +29,7 @@ apiRouter.use("/site", siteRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/settings", settingsRouter);
 apiRouter.use("/uploads", uploadRouter);
+apiRouter.use("/operations", operationsRouter);
 apiRouter.use("/marketplace", marketplaceReviewRouter);
 apiRouter.use("/marketplace", marketplaceConversationRouter);
 apiRouter.use("/marketplace", marketplaceBookingRouter);

@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import { resolvedEnv as env } from "../../config/env.js";
 import { RegistrationOtpModel, type RegistrationOtpIdentifierType, type RegistrationOtpRole } from "../../models/registration-otp.model.js";
 import { RefreshTokenModel } from "../../models/refresh-token.model.js";
-import { UserModel } from "../../models/user.model.js";
+import { USER_ROLES, UserModel } from "../../models/user.model.js";
 import type { UserAccountStatus, UserDocument, UserRole } from "../../models/user.model.js";
 import { HttpError } from "../../utils/http-error.js";
 import { logger } from "../../utils/logger.js";
@@ -595,13 +595,14 @@ export async function signInWithGoogle(
 export function sanitizeUser(
   user: Pick<UserDocument, "id" | "name" | "email" | "role" | "status" | "profileComplete" | "avatar" | "phoneNumber" | "location">,
 ): AuthenticatedUser {
-  const normalizedRole = user.role === "super-admin" || user.role === "vendor" || user.role === "user"
-    ? user.role
-    : user.role === "super_admin" || user.role === "admin"
+  const rawRole = String(user.role);
+  const normalizedRole = USER_ROLES.includes(rawRole as UserRole)
+    ? rawRole as UserRole
+    : rawRole === "super_admin"
       ? "super-admin"
-      : user.role === "consumer" || user.role === "customer"
+      : rawRole === "consumer" || rawRole === "customer"
         ? "user"
-        : user.role === "professional"
+        : rawRole === "professional"
           ? "vendor"
           : "user";
   const normalizedStatus = user.status === "active" || user.status === "invited" || user.status === "disabled"

@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
-import { authorizeRoles, requireAuth, type AuthenticatedRequest } from "../../middleware/auth.js";
+import { authorizePermissions, requireAuth, type AuthenticatedRequest } from "../../middleware/auth.js";
 import { FavoriteModel } from "../../models/favorite.model.js";
 import { MarketplaceBookingModel } from "../../models/booking.model.js";
 import { MarketplaceConversationModel } from "../../models/conversation.model.js";
 import { MarketplaceMessageModel } from "../../models/message.model.js";
 import { MarketplaceReviewModel } from "../../models/review.model.js";
 import { UserSettingsModel } from "../../models/user-setting.model.js";
-import { USER_ACCOUNT_STATUSES, USER_ROLES, UserModel } from "../../models/user.model.js";
+import { USER_ACCOUNT_STATUSES, USER_ROLES, UserModel, type UserRole } from "../../models/user.model.js";
 import { hashPassword } from "../auth/auth.service.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -15,24 +15,51 @@ import { buildPaginationMeta, parsePagination, serializePlatformUser } from "./m
 
 const marketplaceUserRouter = Router();
 
+function normalizeRoleInput(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim();
+  if (normalized === "super_admin") return "super-admin";
+  if (normalized === "professional") return "vendor";
+  if (normalized === "customer" || normalized === "consumer") return "user";
+  return normalized;
+}
+
+function normalizeOptionalPhoneNumber(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+const roleSchema = z.preprocess(normalizeRoleInput, z.enum(USER_ROLES));
+const phoneNumberSchema = z.preprocess(
+  normalizeOptionalPhoneNumber,
+  z.string().max(20).optional(),
+);
+
 const createUserSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email(),
   password: z.string().min(8).max(100).optional(),
-  role: z.enum(USER_ROLES),
+  role: roleSchema,
   status: z.enum(USER_ACCOUNT_STATUSES).default("active"),
   location: z.string().trim().max(120).optional().default(""),
-  phoneNumber: z.string().trim().max(20).optional().default(""),
+  phoneNumber: phoneNumberSchema,
 });
 
 const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   email: z.string().trim().email().optional(),
   password: z.string().min(8).max(100).optional(),
-  role: z.enum(USER_ROLES).optional(),
+  role: roleSchema.optional(),
   status: z.enum(USER_ACCOUNT_STATUSES).optional(),
   location: z.string().trim().max(120).optional(),
-  phoneNumber: z.string().trim().max(20).optional(),
+  phoneNumber: phoneNumberSchema,
 }).refine((value) => Object.values(value).some((entry) => entry !== undefined), {
   message: "At least one user field is required.",
 });
@@ -87,7 +114,7 @@ async function assertUserCanBeDeleted(userId: string, authUserId: string) {
 marketplaceUserRouter.get(
   "/users",
   requireAuth,
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users", "view_users_limited", "view_vendors_limited"),
   asyncHandler(async (request, response) => {
     const page = parsePagination(request.query.page, 1, 500);
     const limit = parsePagination(request.query.limit, 100, 1000);
@@ -131,7 +158,7 @@ marketplaceUserRouter.get(
 marketplaceUserRouter.post(
   "/users",
   requireAuth,
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users"),
   asyncHandler(async (request, response) => {
     const input = createUserSchema.parse(request.body);
     const existingUser = await UserModel.findOne({ email: input.email.toLowerCase() });
@@ -146,7 +173,7 @@ marketplaceUserRouter.post(
       role: input.role,
       status: input.status,
       location: input.location || "",
-      phoneNumber: input.phoneNumber || "",
+      phoneNumber: input.phoneNumber,
       profileComplete: true,
       isSeeded: false,
     });
@@ -162,7 +189,7 @@ marketplaceUserRouter.post(
 marketplaceUserRouter.patch(
   "/users/:userId",
   requireAuth,
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users"),
   asyncHandler(async (request, response) => {
     const input = updateUserSchema.parse(request.body);
     const user = await UserModel.findById(request.params.userId);
@@ -179,7 +206,7 @@ marketplaceUserRouter.patch(
     }
 
     if (input.name !== undefined) user.name = input.name;
-    if (input.role !== undefined) user.role = input.role;
+    if (input.role !== undefined) user.role = input.role as UserRole;
     if (input.status !== undefined) user.status = input.status;
     if (input.location !== undefined) user.location = input.location;
     if (input.phoneNumber !== undefined) user.phoneNumber = input.phoneNumber;
@@ -200,7 +227,7 @@ marketplaceUserRouter.patch(
 marketplaceUserRouter.delete(
   "/users/:userId",
   requireAuth,
-  authorizeRoles("super-admin"),
+  authorizePermissions("manage_users"),
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const authUser = ensureAuthUser(request);
     const userId = String(request.params.userId || "").trim();

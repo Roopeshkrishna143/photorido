@@ -31,6 +31,16 @@ export interface MarketplaceBookingRecord {
   reviewSubmitted: boolean;
   reviewId?: string | null;
   completedAt?: Date | null;
+  operationsNote?: string;
+  escalatedAt?: Date | null;
+  escalationResolvedAt?: Date | null;
+  rescheduledAt?: Date | null;
+  rescheduleResolvedAt?: Date | null;
+  activityHistory?: Array<{
+    type: string;
+    note: string;
+    createdAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -144,6 +154,48 @@ const marketplaceBookingSchema = new Schema<MarketplaceBookingRecord>(
     completedAt: {
       type: Date,
       default: null,
+    },
+    operationsNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    escalatedAt: {
+      type: Date,
+      default: null,
+    },
+    escalationResolvedAt: {
+      type: Date,
+      default: null,
+    },
+    rescheduledAt: {
+      type: Date,
+      default: null,
+    },
+    rescheduleResolvedAt: {
+      type: Date,
+      default: null,
+    },
+    activityHistory: {
+      type: [
+        {
+          type: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          note: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
     },
   },
   {
