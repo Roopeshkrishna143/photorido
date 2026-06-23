@@ -693,8 +693,8 @@ marketplaceRouter.get(
         : { status: "approved" };
 
     const listings = await VendorProfileModel.find(query).sort({ createdAt: -1, updatedAt: -1 });
-    const listingPayload = listings.map((listing) => serializeMarketplaceListing(listing));
-
+    // const listingPayload = listings.map((listing) => serializeMarketplaceListing(listing));
+      const listingPayload: any[] = listings.map((listing) => serializeMarketplaceListing(listing));
     if (isOperationalRole) {
       const profileVendorIds = new Set(listings.map((listing) => listing.vendorId));
       const vendorsWithoutProfiles = await UserModel.find({
