@@ -45,7 +45,7 @@ export interface VendorProfile {
   featuredImageCrop?: VendorProfileImageCrop | null;
   locationInput: string;
   placeId?: string;
-  coordinates: {
+  coordinates?: {
     lat: number;
     lng: number;
   };
